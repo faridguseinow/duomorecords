@@ -62,7 +62,7 @@ a {
 }
 
 .logo-mini {
-  width: 130px;
+  width: 50px;
 }
 
 .logo-mini img {
@@ -408,6 +408,16 @@ a {
   font-weight: 500;
 }
 
+.picker-trigger {
+  border: 1px solid var(--line);
+  background: #121215;
+  color: var(--cream);
+  border-radius: 10px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
 input,
 select,
 textarea,
@@ -429,23 +439,100 @@ textarea {
   resize: vertical;
 }
 
-.calendar-block {
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  overflow: hidden;
+.picker-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.58);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 16px;
 }
 
-.embed-label {
+.picker-modal {
+  width: min(720px, 100%);
+  background: #0c0c0f;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 16px;
+}
+
+.picker-modal-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.picker-modal-head h3 {
   margin: 0;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--line);
+}
+
+.picker-month-nav {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.picker-month-nav strong {
+  text-transform: capitalize;
+}
+
+.picker-calendar-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+
+.calendar-empty {
+  height: 38px;
+}
+
+.calendar-day {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #121215;
+  color: var(--cream);
+  min-height: 38px;
+  cursor: pointer;
+}
+
+.calendar-day:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.calendar-day.active {
+  border-color: var(--gold);
+  box-shadow: inset 0 0 0 1px var(--gold);
+}
+
+.picker-slots {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.picker-slots p {
+  margin: 0;
   color: var(--text-muted);
 }
 
-.calendar {
-  width: 100%;
-  min-height: 470px;
-  border: 0;
+.slot-chip {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #121215;
+  color: var(--cream);
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.slot-chip.active {
+  border-color: var(--gold);
+  background: #201a0f;
 }
 
 .contact-grid {

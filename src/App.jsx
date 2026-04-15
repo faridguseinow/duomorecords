@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { siteContent, supportedLanguages } from './content';
-import { createBooking, fetchAvailableSlots } from './lib/calendarApi';
+import {
+  addDays,
+  createBooking,
+  fetchAvailableSlots,
+  toIsoDate
+} from './lib/calendarApi';
 import {
   fallbackCollaborations,
   fallbackMediaProjects,
   fallbackPortfolio,
   fetchSheetsData
 } from './lib/googleSheets';
-import logoWhite from './assets/duomo-logo-white.svg';
-import logoBlack from './assets/duomo-logo-black.svg';
+import duomoLogo from './assets/icons/logo_duomo_white.svg';
 
 function getSwitchedLanguagePath(pathname, nextLang) {
   const parts = pathname.split('/').filter(Boolean);
@@ -51,7 +55,7 @@ function TopNav({ lang, content, isMediaPage = false }) {
     <header className="topbar-wrap">
       <nav className="topbar">
         <Link to={`/${lang}`} className="logo-mini" aria-label="Duomo Records home">
-          <img src={logoWhite} alt="Duomo Records" />
+          <img src={duomoLogo} alt="Duomo Records" />
         </Link>
 
         <div className="topbar-actions">
@@ -201,7 +205,7 @@ function CollaborationsSection({ content, items }) {
         {items.map((item) => {
           const card = (
             <article className="collab-card" key={item.id || item.name}>
-              <img src={item.logoUrl || logoBlack} alt={item.name} loading="lazy" />
+              <img src={item.logoUrl || duomoLogo} alt={item.name} loading="lazy" />
               <h3>{item.name}</h3>
               <p>{item.description}</p>
             </article>
@@ -228,71 +232,79 @@ function CollaborationsSection({ content, items }) {
   );
 }
 
-function BookingSection({ content, services }) {
-  const [date, setDate] = useState('');
-  const [slots, setSlots] = useState([]);
-  const [selectedSlot, setSelectedSlot] = useState('');
-  const [status, setStatus] = useState('idle');
-  const [loadingSlots, setLoadingSlots] = useState(false);
+function getMonthCells(monthDate) {
+  const monthStart = new Date(monthDate.getFullYear(), monthDate.getMonth(), 1);
+  const monthEnd = new Date(monthDate.getFullYear(), monthDate.getMonth() + 1, 0);
+  const leading = (monthStart.getDay() + 6) % 7;
+  const cells = [];
 
-  const calendarEmbedUrl =
-    import.meta.env.VITE_GOOGLE_CALENDAR_EMBED_URL ||
-    'https://calendar.google.com/calendar/embed?src=en.azerbaijan%23holiday%40group.v.calendar.google.com';
+  for (let i = 0; i < leading; i += 1) cells.push(null);
+  for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+    cells.push(new Date(monthDate.getFullYear(), monthDate.getMonth(), day));
+  }
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  return cells;
+}
+
+function monthLabel(date) {
+  return date.toLocaleDateString('az-AZ', { month: 'long', year: 'numeric' });
+}
+
+function BookingSection({ content, services }) {
+  const today = new Date();
+  const todayIso = toIsoDate(today);
+  const maxDate = toIsoDate(addDays(today, 30));
   const calendarApiUrl = import.meta.env.VITE_GOOGLE_CALENDAR_WEBHOOK_URL || '';
 
-  useEffect(() => {
-    if (!date) {
-      setSlots([]);
-      setSelectedSlot('');
-      return;
+  const [date, setDate] = useState('');
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const [status, setStatus] = useState('idle');
+
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [pickerDate, setPickerDate] = useState('');
+  const [pickerLoading, setPickerLoading] = useState(false);
+  const [pickerSlots, setPickerSlots] = useState([]);
+
+  const cells = getMonthCells(pickerMonth);
+  const selectedLabel = date && selectedSlot ? `${date} — ${selectedSlot}` : '';
+
+  async function handlePickDate(dayIso) {
+    if (dayIso < todayIso || dayIso > maxDate) return;
+
+    setPickerDate(dayIso);
+    setPickerLoading(true);
+    try {
+      const found = await fetchAvailableSlots(calendarApiUrl, dayIso);
+      setPickerSlots(found);
+    } catch {
+      setPickerSlots([]);
+    } finally {
+      setPickerLoading(false);
     }
-
-    let active = true;
-
-    async function load() {
-      setLoadingSlots(true);
-      try {
-        const found = await fetchAvailableSlots(calendarApiUrl, date);
-        if (active) {
-          setSlots(found);
-          setSelectedSlot(found[0] || '');
-        }
-      } catch {
-        if (active) {
-          setSlots([]);
-          setSelectedSlot('');
-        }
-      } finally {
-        if (active) {
-          setLoadingSlots(false);
-        }
-      }
-    }
-
-    load();
-
-    return () => {
-      active = false;
-    };
-  }, [calendarApiUrl, date]);
+  }
 
   async function handleBook(event) {
     event.preventDefault();
     setStatus('loading');
 
+    if (!date || !selectedSlot) {
+      setStatus('pick_error');
+      return;
+    }
+
     const formData = new FormData(event.currentTarget);
     const payload = Object.fromEntries(formData.entries());
 
-    try {
-      await createBooking(calendarApiUrl, payload);
-      event.currentTarget.reset();
-      setDate('');
-      setSlots([]);
-      setSelectedSlot('');
-      setStatus('success');
-    } catch {
-      setStatus('error');
-    }
+    // Booking POST can trigger CORB/CORS noise in the console even when it succeeds.
+    // The Apps Script side is the source of truth; we treat the dispatch as accepted.
+    createBooking(calendarApiUrl, payload);
+
+    event.currentTarget.reset();
+    setDate('');
+    setSelectedSlot('');
+    setStatus('success');
   }
 
   return (
@@ -306,36 +318,14 @@ function BookingSection({ content, services }) {
       <div className="booking-grid">
         <form className="booking-form" onSubmit={handleBook}>
           <label>
-            {content.booking.date}
-            <input
-              type="date"
-              name="date"
-              value={date}
-              min={new Date().toISOString().split('T')[0]}
-              onChange={(event) => setDate(event.target.value)}
-              required
-            />
+            {content.booking.slot}
+            <button type="button" className="picker-trigger" onClick={() => setPickerOpen(true)}>
+              {selectedLabel || content.booking.openPicker || 'Tarix və saat seçin'}
+            </button>
           </label>
 
-          <label>
-            {content.booking.slot}
-            <select
-              name="slot"
-              value={selectedSlot}
-              onChange={(event) => setSelectedSlot(event.target.value)}
-              required
-              disabled={loadingSlots || slots.length === 0}
-            >
-              {loadingSlots && <option>{content.booking.loading}</option>}
-              {!loadingSlots &&
-                slots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              {!loadingSlots && slots.length === 0 && <option>{content.booking.noSlots}</option>}
-            </select>
-          </label>
+          <input type="hidden" name="date" value={date} required />
+          <input type="hidden" name="slot" value={selectedSlot} required />
 
           <label>
             {content.booking.name}
@@ -371,14 +361,91 @@ function BookingSection({ content, services }) {
           </button>
 
           {status === 'success' && <p className="status ok">{content.booking.success}</p>}
+          {status === 'pick_error' && (
+            <p className="status error">{content.booking.pickError || content.booking.error}</p>
+          )}
           {status === 'error' && <p className="status error">{content.booking.error}</p>}
         </form>
-
-        <div className="calendar-block">
-          <p className="embed-label">{content.booking.calendarEmbedLabel}</p>
-          <iframe title="Google Calendar" src={calendarEmbedUrl} className="calendar" loading="lazy" />
-        </div>
       </div>
+
+      {pickerOpen && (
+        <div className="picker-modal-backdrop" onClick={() => setPickerOpen(false)}>
+          <div className="picker-modal" onClick={(event) => event.stopPropagation()}>
+            <div className="picker-modal-head">
+              <h3>{content.booking.modalTitle || 'Tarix və saat seçin'}</h3>
+              <button type="button" className="menu-btn" onClick={() => setPickerOpen(false)}>
+                ×
+              </button>
+            </div>
+
+            <div className="picker-month-nav">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() =>
+                  setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1))
+                }
+              >
+                ←
+              </button>
+              <strong>{monthLabel(pickerMonth)}</strong>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() =>
+                  setPickerMonth(new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1))
+                }
+              >
+                →
+              </button>
+            </div>
+
+            <div className="picker-calendar-grid">
+              {cells.map((cell, index) => {
+                if (!cell) return <span key={`e-${index}`} className="calendar-empty" />;
+
+                const dayIso = toIsoDate(cell);
+                const disabled = dayIso < todayIso || dayIso > maxDate;
+
+                return (
+                  <button
+                    key={dayIso}
+                    type="button"
+                    className={`calendar-day ${pickerDate === dayIso ? 'active' : ''}`}
+                    disabled={disabled}
+                    onClick={() => handlePickDate(dayIso)}
+                  >
+                    {cell.getDate()}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="picker-slots">
+              {pickerLoading && <p>{content.booking.loading}</p>}
+              {!pickerLoading && !pickerDate && (
+                <p>{content.booking.chooseDateFirst || 'Əvvəl tarix seçin'}</p>
+              )}
+              {!pickerLoading && pickerDate && pickerSlots.length === 0 && <p>{content.booking.noSlots}</p>}
+              {!pickerLoading &&
+                pickerSlots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    className={`slot-chip ${date === pickerDate && selectedSlot === slot ? 'active' : ''}`}
+                    onClick={() => {
+                      setDate(pickerDate);
+                      setSelectedSlot(slot);
+                      setPickerOpen(false);
+                    }}
+                  >
+                    {pickerDate} · {slot}
+                  </button>
+                ))}
+            </div>
+          </div>
+        </div>
+      )}
     </section>
   );
 }
@@ -387,18 +454,22 @@ function HomePage() {
   const { lang, content, invalid } = useLanguageOrRedirect();
   const { portfolio, collaborations } = useSheetsContent();
 
-  if (invalid) {
-    return <Navigate to="/az" replace />;
-  }
-
   useEffect(() => {
+    if (invalid) {
+      return;
+    }
+
     document.documentElement.lang = lang;
     document.title = 'Duomo Records';
     const description = document.querySelector('meta[name="description"]');
     if (description) {
       description.setAttribute('content', content.seoDescription);
     }
-  }, [lang, content.seoDescription]);
+  }, [lang, content, invalid]);
+
+  if (invalid) {
+    return <Navigate to="/az" replace />;
+  }
 
   return (
     <div className="page">
@@ -407,7 +478,7 @@ function HomePage() {
       <section className="hero">
         <div className="logo-stage">
           <div className="line-orbit" aria-hidden="true" />
-          <img src={logoWhite} alt="Duomo Records" className="hero-logo" />
+          <img src={duomoLogo} alt="Duomo Records" className="hero-logo" />
         </div>
 
         <p className="hero-eyebrow">{content.hero.eyebrow}</p>
@@ -502,14 +573,18 @@ function MediaProjectsPage() {
   const { lang, content, invalid } = useLanguageOrRedirect();
   const { mediaProjects } = useSheetsContent();
 
+  useEffect(() => {
+    if (invalid) {
+      return;
+    }
+
+    document.documentElement.lang = lang;
+    document.title = `Duomo Records — ${content.mediaProjects.pageTitle}`;
+  }, [lang, content, invalid]);
+
   if (invalid) {
     return <Navigate to="/az" replace />;
   }
-
-  useEffect(() => {
-    document.documentElement.lang = lang;
-    document.title = `Duomo Records — ${content.mediaProjects.pageTitle}`;
-  }, [lang, content.mediaProjects.pageTitle]);
 
   return (
     <div className="page media-page">

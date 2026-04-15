@@ -109,11 +109,18 @@ export const siteContent = {
       phone: 'Mobil nömrə',
       service: 'Xidmət',
       details: 'Qısa qeyd',
+      openPicker: 'Tarix və saat seçin',
+      modalTitle: 'Rezervasiya üçün tarix və saat seçin',
+      chooseDateFirst: 'Əvvəl tarix seçin',
+      pickError: 'Zəhmət olmasa tarix və saat seçin.',
       submit: 'Bronu təsdiqlə',
       loading: 'Yüklənir...',
       success: 'Bron göndərildi. Tezliklə sizinlə əlaqə saxlayacağıq.',
       error: 'Xəta baş verdi. Zəhmət olmasa yenidən yoxlayın.',
-      calendarEmbedLabel: 'Təqvim görüntüsü'
+      availabilityTitle: 'Növbəti 30 gün üçün boş tarixlər',
+      availabilityHint: 'Saytda yalnız boş vaxtlar görünür, müştəri məlumatları gizli qalır.',
+      freeSuffix: 'boş saat',
+      busyLabel: 'Dolu'
     },
     contact: {
       title: 'Bizimlə əlaqə',
@@ -226,11 +233,18 @@ export const siteContent = {
       phone: 'Мобильный номер',
       service: 'Услуга',
       details: 'Комментарий',
+      openPicker: 'Выберите дату и время',
+      modalTitle: 'Выбор даты и времени бронирования',
+      chooseDateFirst: 'Сначала выберите дату',
+      pickError: 'Пожалуйста, выберите дату и время.',
       submit: 'Подтвердить бронь',
       loading: 'Загрузка...',
       success: 'Бронь принята. Мы свяжемся с вами по телефону.',
       error: 'Ошибка бронирования. Проверьте данные и повторите.',
-      calendarEmbedLabel: 'Календарь'
+      availabilityTitle: 'Свободные даты на 30 дней вперёд',
+      availabilityHint: 'Публично показываются только свободные слоты, данные клиентов скрыты.',
+      freeSuffix: 'слотов',
+      busyLabel: 'Занято'
     },
     contact: {
       title: 'Контакты',
@@ -343,11 +357,18 @@ export const siteContent = {
       phone: 'Mobile number',
       service: 'Service',
       details: 'Details',
+      openPicker: 'Choose date and time',
+      modalTitle: 'Choose booking date and time',
+      chooseDateFirst: 'Select a date first',
+      pickError: 'Please choose date and time.',
       submit: 'Confirm booking',
       loading: 'Loading...',
       success: 'Booking received. We will call you shortly.',
       error: 'Booking failed. Please try again.',
-      calendarEmbedLabel: 'Calendar preview'
+      availabilityTitle: 'Free dates for the next 30 days',
+      availabilityHint: 'Only available slots are public. Client details remain private.',
+      freeSuffix: 'slots',
+      busyLabel: 'Busy'
     },
     contact: {
       title: 'Contact',
