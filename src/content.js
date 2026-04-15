@@ -7,7 +7,7 @@ export const siteContent = {
     nav: {
       services: 'Xidmətlər',
       pricing: 'Qiymətlər',
-      portfolio: 'Portfel',
+      portfolio: 'Porno',
       schedule: 'Rezervasiya',
       contact: 'Əlaqə'
     },
@@ -17,7 +17,7 @@ export const siteContent = {
       text:
         'Pop, R&B, EDM və hip-hop janrlarında müasir, keyfiyyətli materiallar hazırlayırıq. İdeyadan hazır mahnıya qədər bütün yaradıcı prosesi yüksək standartlarla təqdim edirik.',
       ctaPrimary: 'Konsultasiya al',
-      ctaSecondary: 'Portfeli izlə'
+      ctaSecondary: 'Porno izlə'
     },
     about: {
       title: 'Haqqımızda',
@@ -80,7 +80,7 @@ export const siteContent = {
       }
     ],
     portfolio: {
-      title: 'Portfel',
+      title: 'Porno',
       text:
         'Burada tamamlanmış treklər, video işlər və kommersiya layihələri yerləşdiriləcək. YouTube / SoundCloud linkləri əlavə oluna bilər.'
     },
