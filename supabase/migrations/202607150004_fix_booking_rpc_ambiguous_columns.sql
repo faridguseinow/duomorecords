@@ -1,114 +1,3 @@
-create unique index bookings_active_slot_unique_idx
-on public.bookings (booking_date, booking_time)
-where status in ('new', 'confirmed', 'in_progress');
-
--- TODO(booking-range): if service/package durations start occupying multiple slots,
--- replace the fixed-slot unique index with tstzrange + exclusion constraint logic.
-
-create or replace function public.generate_booking_number(input_date date)
-returns text
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  candidate text;
-begin
-  loop
-    candidate := 'DM-' || to_char(input_date, 'YYYYMMDD') || '-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 4));
-    exit when not exists (select 1 from public.bookings where booking_number = candidate);
-  end loop;
-
-  return candidate;
-end;
-$$;
-
-create or replace function public.set_booking_number()
-returns trigger
-language plpgsql
-security definer
-set search_path = public
-as $$
-begin
-  if new.booking_number is null or length(trim(new.booking_number)) = 0 then
-    new.booking_number := public.generate_booking_number(new.booking_date);
-  end if;
-
-  return new;
-end;
-$$;
-
-create trigger set_bookings_booking_number
-before insert on public.bookings
-for each row execute function public.set_booking_number();
-
-create or replace function public.get_available_booking_slots(target_date date)
-returns table(slot_time time)
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  settings public.booking_settings%rowtype;
-  slot_value time;
-  local_today date;
-  minimum_local_ts timestamp;
-  candidate_local_ts timestamp;
-begin
-  select *
-  into settings
-  from public.booking_settings
-  where is_booking_enabled = true
-  order by created_at asc
-  limit 1;
-
-  if not found or target_date is null then
-    return;
-  end if;
-
-  -- PostgreSQL extract(isodow) numbering: Monday = 1, Sunday = 7.
-  local_today := (now() at time zone settings.timezone)::date;
-  minimum_local_ts := (now() at time zone settings.timezone) + make_interval(mins => settings.minimum_advance_minutes);
-
-  if target_date < local_today
-    or target_date > local_today + settings.maximum_advance_days
-    or not (extract(isodow from target_date)::integer = any(settings.working_days))
-    or target_date = any(settings.disabled_dates)
-  then
-    return;
-  end if;
-
-  for slot_value in
-    select generated_slot::time
-    from generate_series(
-      target_date + settings.opening_time,
-      target_date + settings.closing_time - make_interval(mins => settings.slot_duration_minutes),
-      make_interval(mins => settings.slot_duration_minutes)
-    ) as generated_slot
-  loop
-    candidate_local_ts := target_date + slot_value;
-
-    if candidate_local_ts < minimum_local_ts then
-      continue;
-    end if;
-
-    if exists (
-      select 1
-      from public.bookings
-      where booking_date = target_date
-        and booking_time = slot_value
-        and status in ('new', 'confirmed', 'in_progress')
-    ) then
-      continue;
-    end if;
-
-    slot_time := slot_value;
-    return next;
-  end loop;
-end;
-$$;
-
 create or replace function public.create_public_booking(
   input_service_id uuid,
   input_package_id uuid,
@@ -141,11 +30,11 @@ declare
   clean_description text := nullif(trim(coalesce(input_project_description, '')), '');
   new_booking public.bookings%rowtype;
 begin
-  select *
+  select bs.*
   into settings
-  from public.booking_settings
-  where is_booking_enabled = true
-  order by created_at asc
+  from public.booking_settings bs
+  where bs.is_booking_enabled = true
+  order by bs.created_at asc
   limit 1;
 
   if not found then
@@ -244,7 +133,4 @@ exception
 end;
 $$;
 
-revoke all on function public.generate_booking_number(date) from public;
-revoke all on function public.set_booking_number() from public;
-grant execute on function public.get_available_booking_slots(date) to anon, authenticated;
 grant execute on function public.create_public_booking(uuid, uuid, date, time, text, text, text, text, text, text, text) to anon, authenticated;

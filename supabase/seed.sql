@@ -132,17 +132,24 @@ set name = excluded.name,
     is_active = excluded.is_active,
     sort_order = excluded.sort_order;
 
-delete from public.process_steps;
-
-insert into public.process_steps (step_number, title, is_active, sort_order)
+insert into public.process_steps (id, step_number, title, is_active, sort_order)
 values
-  (1, '{"az":"Zəng / müraciət","ru":"Заявка","en":"Request"}', true, 10),
-  (2, '{"az":"Brief və referenslər","ru":"Brief и референсы","en":"Brief and references"}', true, 20),
-  (3, '{"az":"Recording / production","ru":"Запись / production","en":"Recording / production"}', true, 30),
-  (4, '{"az":"Mix & Master","ru":"Mix & Master","en":"Mix & Master"}', true, 40),
-  (5, '{"az":"Düzəlişlər","ru":"Правки","en":"Revisions"}', true, 50),
-  (6, '{"az":"Final transfer / release","ru":"Финальная передача / релиз","en":"Final transfer / release"}', true, 60)
-;
+  ('10000000-0000-4000-8000-000000000001', 1, '{"az":"Zəng / müraciət","ru":"Заявка","en":"Request"}', true, 10),
+  ('10000000-0000-4000-8000-000000000002', 2, '{"az":"Brief və referenslər","ru":"Brief и референсы","en":"Brief and references"}', true, 20),
+  ('10000000-0000-4000-8000-000000000003', 3, '{"az":"Recording / production","ru":"Запись / production","en":"Recording / production"}', true, 30),
+  ('10000000-0000-4000-8000-000000000004', 4, '{"az":"Mix & Master","ru":"Mix & Master","en":"Mix & Master"}', true, 40),
+  ('10000000-0000-4000-8000-000000000005', 5, '{"az":"Düzəlişlər","ru":"Правки","en":"Revisions"}', true, 50),
+  ('10000000-0000-4000-8000-000000000006', 6, '{"az":"Final transfer / release","ru":"Финальная передача / релиз","en":"Final transfer / release"}', true, 60)
+on conflict (id) do update
+set step_number = excluded.step_number,
+    title = excluded.title,
+    is_active = excluded.is_active,
+    sort_order = excluded.sort_order;
+
+update public.process_steps
+set is_active = false
+where title->>'en' in ('Request', 'Brief and references', 'Recording / production', 'Mix & Master', 'Revisions', 'Final transfer / release')
+  and id::text not like '10000000-0000-4000-8000-%';
 
 insert into public.courses (slug, title, short_description, enrollment_enabled, is_featured, is_active, sort_order)
 values
@@ -176,15 +183,23 @@ set slug_ru = excluded.slug_ru,
     seo_title = excluded.seo_title,
     seo_description = excluded.seo_description;
 
-delete from public.instagram_posts;
-
-insert into public.instagram_posts (caption, instagram_url, published_at, is_active, sort_order)
+insert into public.instagram_posts (id, caption, instagram_url, published_at, is_active, sort_order)
 values
-  ('{"az":"Studio session","ru":"Studio session","en":"Studio session"}', 'https://instagram.com/duomorecords', now(), true, 10),
-  ('{"az":"Vocal direction","ru":"Vocal direction","en":"Vocal direction"}', 'https://instagram.com/duomorecords', now(), true, 20),
-  ('{"az":"Mix detail","ru":"Mix detail","en":"Mix detail"}', 'https://instagram.com/duomorecords', now(), true, 30),
-  ('{"az":"Release visual","ru":"Release visual","en":"Release visual"}', 'https://instagram.com/duomorecords', now(), true, 40)
-;
+  ('20000000-0000-4000-8000-000000000001', '{"az":"Studio session","ru":"Studio session","en":"Studio session"}', 'https://instagram.com/duomorecords', now(), true, 10),
+  ('20000000-0000-4000-8000-000000000002', '{"az":"Vocal direction","ru":"Vocal direction","en":"Vocal direction"}', 'https://instagram.com/duomorecords', now(), true, 20),
+  ('20000000-0000-4000-8000-000000000003', '{"az":"Mix detail","ru":"Mix detail","en":"Mix detail"}', 'https://instagram.com/duomorecords', now(), true, 30),
+  ('20000000-0000-4000-8000-000000000004', '{"az":"Release visual","ru":"Release visual","en":"Release visual"}', 'https://instagram.com/duomorecords', now(), true, 40)
+on conflict (id) do update
+set caption = excluded.caption,
+    instagram_url = excluded.instagram_url,
+    published_at = excluded.published_at,
+    is_active = excluded.is_active,
+    sort_order = excluded.sort_order;
+
+update public.instagram_posts
+set is_active = false
+where caption->>'en' in ('Studio session', 'Vocal direction', 'Mix detail', 'Release visual')
+  and id::text not like '20000000-0000-4000-8000-%';
 
 insert into public.booking_settings (
   id,
