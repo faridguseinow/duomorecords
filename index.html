@@ -2,14 +2,23 @@
 <html lang="az">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta
       name="description"
-      content="Duomo Records — musiqi prodüserliyi, səsyazma, mix & mastering və kurslar."
+      content="Duomo Records — musiqi prodakşnı, səsyazma, mix/mastering, media və kreativ xidmətlər."
     />
+    <meta name="theme-color" content="#f6f1e8" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="DUOMO Records" />
+    <link rel="icon" href="/src/assets/icons/logo_duomo_white.svg" type="image/svg+xml" />
+    <!-- TODO(PWA): add manifest and production icon set in the dedicated PWA stage. -->
     <title>Duomo Records</title>
-
-    <script src="https://app.inlyne.ai/scripts/preview.js" async></script>
+    <script>
+      (function () {
+        var savedTheme = localStorage.getItem('duomo-theme') || 'light';
+        document.documentElement.dataset.theme = savedTheme;
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

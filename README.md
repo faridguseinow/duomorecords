@@ -1,56 +1,60 @@
 # Duomo Records Website
 
-React + Vite website for `duomorecords.com` with multilingual routing and Google integrations.
+React + Vite frontend for `duomorecords.com`.
 
-## Live structure
+## Stack
 
-- Languages: `/az` (default), `/ru`, `/en`
-- Main sections:
-- Services
-- Packages (with booking CTA)
-- Portfolio (Google Sheets, carousel on desktop/tablet, vertical on mobile)
-- Collaborations (Google Sheets)
-- Booking (Google Calendar availability + booking form)
-- Contact
-- Extra page: `/:lang/media-projects` (Google Sheets)
+- React 19
+- Vite 6
+- react-router-dom
+- JavaScript / JSX
 
-## Design setup
+## Routes
 
-- Font: `Onest`
-- Main colors:
-- `--cream: #f2ede4`
-- `--gold: #d4a853`
-- `--gold-bright: #f0c870`
-- Desktop: top navbar with dropdown burger menu
-- Mobile: bottom nav (Home / Book / Media)
+- `/az`, `/ru`, `/en`
+- `/:lang/media-projects`
+- `/:lang/blog`
+- `/:lang/blog/:slug`
+- `/:lang/profile`
 
-## Google integrations
+## Current Stage
 
-### 1) Google Calendar
+This stage connects the frontend to Supabase while keeping local fallback data:
 
-Two parts are used:
+- refreshed light-first visual system;
+- dark theme with `localStorage` persistence;
+- Supabase data layer for services, packages, projects, media, blog, Instagram and booking;
+- local fallback data when Supabase env is missing or a section request fails;
+- booking availability and creation through Supabase RPC;
+- mobile bottom navigation;
+- PWA meta preparation only.
 
-1. Keep booking calendar private (do not expose event details publicly).
-2. Apps Script webhook (`VITE_GOOGLE_CALENDAR_WEBHOOK_URL`) for:
-- `GET ?action=availability&date=YYYY-MM-DD`
-- `POST { action: "book", name, phone, service, date, slot, details }`
+Auth, admin panel, Telegram bot, courses backend and production PWA are intentionally not connected yet.
 
-The website now shows only free dates/slots for the next 30 days and does not render public event details.
+## Data
 
-Ready starter script: [docs/google-apps-script-calendar.js](/Users/a1111/Documents/My projects/Github/duomorecords/docs/google-apps-script-calendar.js)
+Mock data lives in:
 
-### 2) Google Sheets (one spreadsheet, multiple sheets)
+- `src/data/site.js`
 
-Expected worksheets:
-- `portfolio`
-- `media_projects`
-- `collaborations`
+Supabase services and hooks live in:
 
-Column structure: [docs/google-sheets-structure.md](/Users/a1111/Documents/My projects/Github/duomorecords/docs/google-sheets-structure.md)
+- `src/lib/supabase.js`
+- `src/services/`
+- `src/hooks/`
 
-## Environment variables
+Database setup lives in:
 
-Create `.env` from `.env.example`.
+- `supabase/migrations/`
+- `supabase/seed.sql`
+- `supabase/README.md`
+
+Create `.env` from `.env.example`:
+
+```bash
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+```
 
 ## Run
 
@@ -59,10 +63,3 @@ npm install
 npm run dev
 npm run build
 ```
-
-## Deploy to Vercel
-
-1. Push repository to GitHub.
-2. Import project in Vercel.
-3. Add all `VITE_...` env vars.
-4. Deploy.
