@@ -1,0 +1,25 @@
+{
+  "type": "UPDATE",
+  "table": "bookings",
+  "schema": "public",
+  "record": {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "booking_number": "DM-TEST-001",
+    "booking_date": "2026-07-17",
+    "booking_time": "16:00:00",
+    "customer_name": "Test Client",
+    "customer_phone": "+994 00 000 00 00",
+    "preferred_contact": "whatsapp",
+    "language": "az",
+    "status": "confirmed",
+    "updated_at": "2026-07-15T10:10:00+04:00"
+  },
+  "old_record": {
+    "id": "00000000-0000-4000-8000-000000000101",
+    "booking_number": "DM-TEST-001",
+    "booking_date": "2026-07-16",
+    "booking_time": "14:00:00",
+    "status": "confirmed",
+    "updated_at": "2026-07-15T10:05:00+04:00"
+  }
+}

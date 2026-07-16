@@ -1,0 +1,8 @@
+[functions.telegram-booking-notification]
+verify_jwt = false
+
+[functions.telegram-bot-webhook]
+verify_jwt = false
+
+[functions.telegram-booking-reminders]
+verify_jwt = false

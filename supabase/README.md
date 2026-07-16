@@ -102,3 +102,97 @@ After seed:
 4. Try the same date/time again and confirm `slot_unavailable`.
 5. As anon, verify direct `select * from public.bookings` returns no rows or is denied by RLS.
 6. As anon, verify direct insert/update/delete on content tables is denied.
+
+## First Admin User
+
+1. Open Supabase Dashboard.
+2. Go to Authentication -> Users.
+3. Create a user with email/password.
+4. Copy the created user UUID.
+5. Run this SQL with the copied UUID:
+
+```sql
+insert into public.admin_users (
+  id,
+  display_name,
+  is_active
+)
+values (
+  'USER_UUID',
+  'DUOMO Admin',
+  true
+);
+```
+
+After that the user can sign in at:
+
+```text
+/az/admin/login
+```
+
+Do not put passwords, service role keys, database passwords, or access tokens in this repository.
+
+## Telegram Notifications
+
+Telegram integration uses Supabase Edge Functions and Supabase Secrets. Never put Telegram tokens or chat IDs in frontend env files.
+
+Create a local file from `supabase/.env.functions.example`:
+
+```bash
+cp supabase/.env.functions.example supabase/.env.functions
+```
+
+Fill it locally, then set secrets:
+
+```bash
+npx supabase secrets set --env-file supabase/.env.functions
+```
+
+Required secrets:
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `TELEGRAM_WEBHOOK_SECRET`
+- `TELEGRAM_BOT_WEBHOOK_SECRET`
+- `TELEGRAM_ALLOWED_USER_IDS`
+- `ADMIN_SITE_URL`
+
+Deploy functions:
+
+```bash
+npx supabase functions deploy telegram-booking-notification --no-verify-jwt
+npx supabase functions deploy telegram-bot-webhook --no-verify-jwt
+npx supabase functions deploy telegram-booking-reminders --no-verify-jwt
+```
+
+Create a Database Webhook in Supabase Dashboard:
+
+- Table: `public.bookings`
+- Events: `INSERT`, `UPDATE`
+- Method: `POST`
+- URL: `https://PROJECT_REF.supabase.co/functions/v1/telegram-booking-notification`
+- Headers:
+  - `Content-Type: application/json`
+  - `x-duomo-webhook-secret: TELEGRAM_WEBHOOK_SECRET_VALUE`
+
+Do not create a DELETE webhook.
+
+Set Telegram Bot webhook with Bot API using `TELEGRAM_BOT_WEBHOOK_SECRET` as `secret_token`:
+
+```text
+https://PROJECT_REF.supabase.co/functions/v1/telegram-bot-webhook
+```
+
+Do not paste the Bot API URL with token into git, docs, screenshots, or chat.
+
+Configure reminders through Supabase scheduled functions or Dashboard cron:
+
+- Function: `telegram-booking-reminders`
+- Frequency: every 10 or 15 minutes
+- Method: `POST`
+- Header: `x-duomo-webhook-secret`
+
+Admin UI:
+
+- `/az/admin/settings` contains Telegram notification settings and test notification button.
+- `/az/admin/notifications` contains notification log, delivery attempts, and retry for failed booking notifications.

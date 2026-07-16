@@ -16,6 +16,8 @@ React + Vite frontend for `duomorecords.com`.
 - `/:lang/blog`
 - `/:lang/blog/:slug`
 - `/:lang/profile`
+- `/:lang/admin/login`
+- `/:lang/admin/*`
 
 ## Current Stage
 
@@ -26,10 +28,11 @@ This stage connects the frontend to Supabase while keeping local fallback data:
 - Supabase data layer for services, packages, projects, media, blog, Instagram and booking;
 - local fallback data when Supabase env is missing or a section request fails;
 - booking availability and creation through Supabase RPC;
+- protected staff admin area through Supabase Auth and `admin_users`;
 - mobile bottom navigation;
 - PWA meta preparation only.
 
-Auth, admin panel, Telegram bot, courses backend and production PWA are intentionally not connected yet.
+Client profiles, Telegram bot, courses backend and production PWA are intentionally not connected yet.
 
 ## Data
 
@@ -48,6 +51,8 @@ Database setup lives in:
 - `supabase/migrations/`
 - `supabase/seed.sql`
 - `supabase/README.md`
+
+First admin setup is documented in `supabase/README.md`.
 
 Create `.env` from `.env.example`:
 

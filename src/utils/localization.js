@@ -36,3 +36,26 @@ export function getLocalizedValue(value, language, fallbackLanguage = FALLBACK_L
 
   return first || '';
 }
+
+export function normalizeLocalizedObject(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { az: '', ru: '', en: '' };
+  }
+
+  return {
+    az: value.az || '',
+    ru: value.ru || '',
+    en: value.en || ''
+  };
+}
+
+export function setLocalizedValue(value, language, nextValue) {
+  return {
+    ...normalizeLocalizedObject(value),
+    [language]: nextValue
+  };
+}
+
+export function localizedFormDefaults(value) {
+  return normalizeLocalizedObject(value);
+}

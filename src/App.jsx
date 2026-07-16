@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import duomoLogo from './assets/icons/logo_duomo_white.svg';
+import { AdminProtectedRoute } from './components/admin/AdminProtectedRoute';
+import { AdminAuthProvider } from './context/AdminAuthContext';
 import { siteContent } from './data/site';
 import { useBlogPost, useBlogPosts } from './hooks/useBlogPosts';
 import { useBookingSlots, useCreateBooking } from './hooks/useBookings';
@@ -9,6 +11,10 @@ import { useSiteContent } from './hooks/useSiteContent';
 import { useTheme } from './hooks/useTheme';
 import { normalizeBookingForm, validateBookingPayload } from './services/bookingService';
 import { SUPPORTED_LANGUAGES } from './utils/constants';
+import { getLocalizedValue } from './utils/localization';
+
+const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
+const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })));
 
 function getLangPath(pathname, nextLang) {
   const parts = pathname.split('/').filter(Boolean);
@@ -249,6 +255,9 @@ function HomePage({ theme, onThemeToggle }) {
   const processSteps = homepage.processSteps || [];
   const instagramPosts = homepage.instagramPosts || [];
   const hasContentWarning = homepageError || Object.values(homepage.errors || {}).some(Boolean);
+  const sectionMap = Object.fromEntries((homepage.sections || []).map((section) => [section.section_key, section]));
+  const isSectionVisible = (key) => !homepage.sections?.length || sectionMap[key]?.is_visible !== false;
+  const sectionTitle = (key, fallback) => getLocalizedValue(sectionMap[key]?.title, lang) || fallback;
 
   return (
     <div className="app-shell">
@@ -273,8 +282,8 @@ function HomePage({ theme, onThemeToggle }) {
           <a href="#services" className="scroll-cue">{content.hero.scroll}</a>
         </section>
 
-        <section id="services" className="wide-section services-section" data-reveal>
-          <SectionIntro eyebrow="SERVICES" title={content.sections.services} />
+        {isSectionVisible('services') && <section id="services" className="wide-section services-section" data-reveal>
+          <SectionIntro eyebrow="SERVICES" title={sectionTitle('services', content.sections.services)} />
           {homepageLoading && <SkeletonRows />}
           {hasContentWarning && <StateMessage>Some live content is temporarily unavailable. Fallback content is shown where needed.</StateMessage>}
           <div className="service-list">
@@ -292,10 +301,10 @@ function HomePage({ theme, onThemeToggle }) {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section id="pricing" className="wide-section packages-section" data-reveal>
-          <SectionIntro eyebrow="PACKAGES" title={content.sections.packages} text={content.packageIntro} />
+        {isSectionVisible('packages') && <section id="pricing" className="wide-section packages-section" data-reveal>
+          <SectionIntro eyebrow="PACKAGES" title={sectionTitle('packages', content.sections.packages)} text={content.packageIntro} />
           <div className="package-stack">
             {packages.map((item) => (
               <article className={`package-row ${item.featured ? 'featured' : ''}`} key={item.id}>
@@ -313,10 +322,10 @@ function HomePage({ theme, onThemeToggle }) {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section id="portfolio" className="wide-section project-section" data-reveal>
-          <SectionIntro eyebrow="PROJECTS" title={content.sections.portfolio} />
+        {isSectionVisible('portfolio') && <section id="portfolio" className="wide-section project-section" data-reveal>
+          <SectionIntro eyebrow="PROJECTS" title={sectionTitle('portfolio', content.sections.portfolio)} />
           <div className="project-track" aria-label="Project previews">
             {projects.map((project) => (
               <article className="project-panel" key={project.id}>
@@ -329,21 +338,21 @@ function HomePage({ theme, onThemeToggle }) {
               </article>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <section id="about" className="wide-section about-section" data-reveal>
-          <SectionIntro eyebrow="ABOUT" title={content.sections.about} />
+        {isSectionVisible('about') && <section id="about" className="wide-section about-section" data-reveal>
+          <SectionIntro eyebrow="ABOUT" title={sectionTitle('about', content.sections.about)} />
           <div className="about-grid">
             <p>{content.about.lead}</p>
             <div>
               {content.about.facts.map((fact) => <span key={fact}>{fact}</span>)}
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="wide-section split-section" data-reveal>
+        {(isSectionVisible('artists') || isSectionVisible('partners')) && <section className="wide-section split-section" data-reveal>
           <div>
-            <SectionIntro eyebrow="CLIENTS" title={content.sections.artists} />
+            <SectionIntro eyebrow="CLIENTS" title={sectionTitle('artists', content.sections.artists)} />
             <div className="people-grid">
               {artists.map((artist) => (
                 <article className="person-tile" key={artist.name}>
@@ -355,15 +364,15 @@ function HomePage({ theme, onThemeToggle }) {
             </div>
           </div>
           <div>
-            <SectionIntro eyebrow="NETWORK" title={content.sections.partners} />
+            <SectionIntro eyebrow="NETWORK" title={sectionTitle('partners', content.sections.partners)} />
             <div className="partner-grid">
               {partners.map((partner) => <span key={partner.id || partner.name}>{partner.name || partner}</span>)}
             </div>
           </div>
-        </section>
+        </section>}
 
-        <section className="wide-section process-section" data-reveal>
-          <SectionIntro eyebrow="PROCESS" title={content.sections.process} />
+        {isSectionVisible('work_process') && <section className="wide-section process-section" data-reveal>
+          <SectionIntro eyebrow="PROCESS" title={sectionTitle('work_process', content.sections.process)} />
           <ol className="process-list">
             {processSteps.map((step, index) => (
               <li key={step.id || step.title}>
@@ -372,15 +381,15 @@ function HomePage({ theme, onThemeToggle }) {
               </li>
             ))}
           </ol>
-        </section>
+        </section>}
 
-        <section id="courses" className="wide-section courses-section" data-reveal>
+        {isSectionVisible('courses') && <section id="courses" className="wide-section courses-section" data-reveal>
           <SectionIntro eyebrow="ACADEMY" title={content.courses.title} text={content.courses.text} />
           <span className="technical-note">{content.labels.placeholder}</span>
-        </section>
+        </section>}
 
-        <section id="media" className="wide-section media-preview-section" data-reveal>
-          <SectionIntro eyebrow="MEDIA" title={content.mediaProjects.title} text={content.mediaProjects.text} />
+        {isSectionVisible('media_projects') && <section id="media" className="wide-section media-preview-section" data-reveal>
+          <SectionIntro eyebrow="MEDIA" title={sectionTitle('media_projects', content.mediaProjects.title)} text={content.mediaProjects.text} />
           <div className="media-grid">
             {mediaProjects.map((item, index) => (
               <article className="media-card" key={item.id || item.title}>
@@ -390,10 +399,10 @@ function HomePage({ theme, onThemeToggle }) {
             ))}
           </div>
           <Link to={`/${lang}/media-projects`} className="text-link">{content.labels.viewAll}</Link>
-        </section>
+        </section>}
 
-        <section className="wide-section blog-preview-section" data-reveal>
-          <SectionIntro eyebrow="BLOG" title={content.sections.blog} />
+        {isSectionVisible('blog') && <section className="wide-section blog-preview-section" data-reveal>
+          <SectionIntro eyebrow="BLOG" title={sectionTitle('blog', content.sections.blog)} />
           {blogPreviewLoading && <SkeletonRows count={2} />}
           {!blogPreviewLoading && !firstPost && <StateMessage>No published posts yet.</StateMessage>}
           {firstPost && (
@@ -414,10 +423,10 @@ function HomePage({ theme, onThemeToggle }) {
               </div>
             </div>
           )}
-        </section>
+        </section>}
 
-        <section className="wide-section instagram-section" data-reveal>
-          <SectionIntro eyebrow="SOCIAL" title={content.sections.instagram} />
+        {isSectionVisible('instagram') && <section className="wide-section instagram-section" data-reveal>
+          <SectionIntro eyebrow="SOCIAL" title={sectionTitle('instagram', content.sections.instagram)} />
           <div className="instagram-grid">
             {instagramPosts.map((post) => (
               <a href={post.href} target="_blank" rel="noopener noreferrer" key={post.id} aria-label={post.title}>
@@ -426,11 +435,11 @@ function HomePage({ theme, onThemeToggle }) {
               </a>
             ))}
           </div>
-        </section>
+        </section>}
 
-        <BookingSection lang={lang} content={content} services={services} packages={packages} fallbackSlots={homepage.timeSlots} bookingSettings={homepage.bookingSettings} />
+        {isSectionVisible('booking') && <BookingSection lang={lang} content={content} services={services} packages={packages} fallbackSlots={homepage.timeSlots} bookingSettings={homepage.bookingSettings} />}
 
-        <ContactFooter lang={lang} content={content} />
+        {isSectionVisible('contacts') && <ContactFooter lang={lang} content={content} />}
       </main>
       <MobileBottomNav lang={lang} content={content} />
     </div>
@@ -768,6 +777,28 @@ export default function App() {
       <Route path="/:lang/blog" element={<BlogPage theme={theme} onThemeToggle={toggleTheme} />} />
       <Route path="/:lang/blog/:slug" element={<BlogArticlePage theme={theme} onThemeToggle={toggleTheme} />} />
       <Route path="/:lang/profile" element={<ProfilePage theme={theme} onThemeToggle={toggleTheme} />} />
+      <Route
+        path="/:lang/admin/login"
+        element={
+          <AdminAuthProvider>
+            <Suspense fallback={<div className="admin-auth-screen">Loading...</div>}>
+              <AdminLoginPage />
+            </Suspense>
+          </AdminAuthProvider>
+        }
+      />
+      <Route
+        path="/:lang/admin/*"
+        element={
+          <AdminAuthProvider>
+            <AdminProtectedRoute>
+              <Suspense fallback={<div className="admin-auth-screen">Loading...</div>}>
+                <AdminApp />
+              </Suspense>
+            </AdminProtectedRoute>
+          </AdminAuthProvider>
+        }
+      />
       <Route path="*" element={<Navigate to="/az" replace />} />
     </Routes>
   );
