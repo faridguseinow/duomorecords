@@ -5,23 +5,23 @@ const shared = {
     {
       id: 'economy',
       name: 'Economy',
-      price: '100 AZN',
+      price: '150 AZN',
       marker: '01',
       features: ['1 hour recording', 'Basic vocal cleanup', 'WAV + MP3', 'Up to 2 revisions']
     },
     {
       id: 'standard',
       name: 'Standard',
-      price: '150 AZN',
+      price: '200 AZN',
       marker: '02',
-      featured: true,
       features: ['1 hour recording', 'Mix & mastering', 'Vocal effects', 'WAV + MP3', 'Up to 3 revisions']
     },
     {
       id: 'premium',
       name: 'Premium',
-      price: '200 AZN',
+      price: '250 AZN',
       marker: '03',
+      featured: true,
       features: ['2 hour recording', 'High-end mix & mastering', 'AutoTune / Melodyne', 'Sound design', 'Up to 5 revisions']
     }
   ],
@@ -55,13 +55,12 @@ export const siteContent = {
       blog: 'Blog',
       courses: 'Kurslar',
       booking: 'Bron',
-      profile: 'Profil',
       menu: 'Menyu'
     },
     hero: {
       eyebrow: 'MUSIC PRODUCTION STUDIO',
       title: 'Səsi ideyadan final relizə qədər dizayn edirik',
-      text: 'DUOMO Records musiqi prodakşnı, recording, mix/mastering, klip, reels və vizual kontenti bir istehsal xəttində birləşdirir.',
+      text: 'DUOMO Records artistlər və brendlər üçün ideyanı hazır səsə, vizuala və reliz kontentinə çevirir.',
       primary: 'Bron yarat',
       secondary: 'Layihələrə bax',
       scroll: 'Aşağı'
@@ -76,7 +75,10 @@ export const siteContent = {
       viewAll: 'Hamısına bax',
       share: 'Paylaş',
       backToBlog: 'Bloga qayıt',
-      placeholder: 'Növbəti mərhələdə qoşulacaq'
+      placeholder: 'Növbəti mərhələdə qoşulacaq',
+      bestSeller: 'Best seller',
+      learnMore: 'Daha ətraflı',
+      bookAcademy: 'Academy kursuna yazıl'
     },
     sections: {
       services: 'Xidmətlər',
@@ -100,7 +102,7 @@ export const siteContent = {
       { id: 'music-videos', category: 'Video', title: 'Music Videos / Clips', text: 'Klip konsepti, çəkiliş, montaj və release üçün vizual paket.' },
       { id: 'reels', category: 'Social', title: 'Reels', text: 'Artist və brendlər üçün qısa formatlı, ritmik video kontent.' },
       { id: 'graphic-design', category: 'Visual', title: 'Graphic Design', text: 'Cover art, logo, banner, promo və kampaniya vizualları.' },
-      { id: 'courses', category: 'Academy', title: 'Courses', text: 'Prodakşn, səs rejissorluğu və aranjiman üzrə hazırlıq modulları.' }
+      { id: 'courses', category: 'Academy', title: 'DUOMO Academy', text: 'Prodakşn, səs yazma, mix və aranjiman üzrə praktik kurslar.' }
     ],
     packageIntro: 'Qiymətlər mock-datadır və Supabase mərhələsində idarə olunan kataloqa çevriləcək.',
     about: {
@@ -115,7 +117,7 @@ export const siteContent = {
     process: ['Zəng / müraciət', 'Brief və referenslər', 'Recording / production', 'Mix & Master', 'Düzəlişlər', 'Final transfer / release'],
     courses: {
       title: 'DUOMO Academy',
-      text: 'Kurs modulları üçün frontend yeri hazırdır. Auth, profil və ödəniş ayrı mərhələdə qoşulacaq.'
+      text: 'Səs yazma, prodakşn, aranjiman və mix/mastering üzrə praktik dərslər. Kurslar studiya workflow-u üzərində qurulur və real layihə tapşırıqları ilə tamamlanır.'
     },
     mediaProjects: {
       title: 'Media Projects',
@@ -169,27 +171,24 @@ export const siteContent = {
       }
     ],
     booking: {
-      title: 'Layihə üçün slot hazırlayın',
-      text: 'Tarixi seçin, boş saatları görün və layihə zayavkasını DUOMO booking sisteminə göndərin.',
+      title: 'Layihə üçün zayavka göndərin',
+      text: 'Xidməti seçin, əlaqə məlumatlarını yazın. Komandamız sizinlə əlaqə saxlayıb uyğun tarixi və saatı təsdiqləyəcək.',
       service: 'Xidmət və ya paket',
-      date: 'Tarix',
-      time: 'Saat',
       name: 'Ad və soyad',
+      email: 'Email (istəyə bağlı)',
       phone: 'Telefon',
-      description: 'Layihə haqqında',
+      description: 'Nə etmək istəyirsiniz?',
+      descriptionPlaceholder: 'Layihə, mahnı, referenslər, istədiyiniz xidmət və vacib detallar haqqında yazın.',
       contact: 'Əlaqə üsulu',
-      submit: 'Zayavkanı hazırla',
-      ready: 'Zayavka qəbul edildi.',
+      call: 'Zəng',
+      submit: 'Göndər',
+      ready: 'Zayavka göndərildi.',
       required: 'Zəhmət olmasa bütün məcburi xanaları doldurun.'
     },
     contacts: {
       whatsapp: '+994 99 340 03 40',
       instagram: '@duomorecords',
       address: '28 May, Jalə Plaza, Bakı, Azərbaycan'
-    },
-    profile: {
-      title: 'Profil',
-      text: 'Avtorizasiya və şəxsi kabinet növbəti mərhələdə Supabase ilə qoşulacaq.'
     }
   },
   ru: {
@@ -197,16 +196,16 @@ export const siteContent = {
       title: 'Duomo Records',
       description: 'Duomo Records — музыкальный продакшн, запись, mix/mastering, медиа и креативные услуги.'
     },
-    nav: { home: 'Главная', services: 'Услуги', projects: 'Проекты', media: 'Media', blog: 'Blog', courses: 'Курсы', booking: 'Бронь', profile: 'Профиль', menu: 'Меню' },
+    nav: { home: 'Главная', services: 'Услуги', projects: 'Проекты', media: 'Media', blog: 'Blog', courses: 'Курсы', booking: 'Бронь', menu: 'Меню' },
     hero: {
       eyebrow: 'MUSIC PRODUCTION STUDIO',
       title: 'Проектируем звук от идеи до финального релиза',
-      text: 'DUOMO Records объединяет music production, запись, mix/mastering, клипы, reels и визуальный контент в одной продакшн-системе.',
+      text: 'DUOMO Records помогает артистам и брендам превращать идею в готовый звук, визуал и релизный контент.',
       primary: 'Подготовить бронь',
       secondary: 'Смотреть проекты',
       scroll: 'Ниже'
     },
-    labels: { theme: 'Переключить тему', language: 'Выбрать язык', readMore: 'Читать', book: 'Бронь', bookService: 'Выбрать услугу', bookPackage: 'Выбрать пакет', viewAll: 'Смотреть всё', share: 'Поделиться', backToBlog: 'Назад в блог', placeholder: 'Будет подключено позже' },
+    labels: { theme: 'Переключить тему', language: 'Выбрать язык', readMore: 'Читать', book: 'Бронь', bookService: 'Выбрать услугу', bookPackage: 'Выбрать пакет', viewAll: 'Смотреть всё', share: 'Поделиться', backToBlog: 'Назад в блог', placeholder: 'Будет подключено позже', bestSeller: 'Best seller', learnMore: 'Подробнее', bookAcademy: 'Записаться в Academy' },
     sections: { services: 'Услуги', packages: 'Пакеты', portfolio: 'Портфолио', about: 'О студии', artists: 'Artists / Clients', partners: 'Partners', process: 'Процесс', courses: 'Courses preview', media: 'Media projects', blog: 'Blog', instagram: 'Instagram', booking: 'Booking', contacts: 'Контакты' },
     services: [
       { id: 'music-production', category: 'Studio', title: 'Music Production', text: 'Аранжировка, beat, topline и готовый к релизу музыкальный продакшн.' },
@@ -215,34 +214,33 @@ export const siteContent = {
       { id: 'music-videos', category: 'Video', title: 'Music Videos / Clips', text: 'Концепт, съёмка, монтаж и визуальный пакет релиза.' },
       { id: 'reels', category: 'Social', title: 'Reels', text: 'Короткий ритмичный видеоконтент для артистов и брендов.' },
       { id: 'graphic-design', category: 'Visual', title: 'Graphic Design', text: 'Cover art, logo, banner, promo и campaign visuals.' },
-      { id: 'courses', category: 'Academy', title: 'Courses', text: 'Модули по продакшну, звукорежиссуре и аранжировке.' }
+      { id: 'courses', category: 'Academy', title: 'DUOMO Academy', text: 'Практические курсы по продакшну, записи, миксу и аранжировке.' }
     ],
     packageIntro: 'Цены пока mock-данные и позже будут управляться через Supabase.',
     about: { lead: 'DUOMO — бакинская продакшн-студия, где звук, визуал и медиа-ритм собираются одной командой.', facts: ['Pop, R&B, EDM, hip-hop', 'Recording + post-production', 'Media и release support'] },
     artists: [{ name: 'Ayla', role: 'Vocal production' }, { name: 'RZ Project', role: 'Mix & mastering' }, { name: 'NOVA', role: 'Visual direction' }],
     process: ['Заявка', 'Brief и референсы', 'Запись / production', 'Mix & Master', 'Правки', 'Финальная передача / релиз'],
-    courses: { title: 'DUOMO Academy', text: 'Место под курсы подготовлено. Auth, профиль и оплата подключаются отдельным этапом.' },
+    courses: { title: 'DUOMO Academy', text: 'Практические занятия по записи, продакшну, аранжировке и mix/mastering. Обучение построено вокруг студийного workflow и реальных проектных заданий.' },
     mediaProjects: { title: 'Media Projects', text: 'Сессии, backstage, reels и специальные media-форматы.', items: ['Behind The Session', 'Live Vocal Direction', 'Clip Moodboard'] },
     blogPosts: [],
-    booking: { title: 'Подготовить заявку на проект', text: 'Выберите дату, посмотрите доступные слоты и отправьте заявку в booking-систему DUOMO.', service: 'Услуга или пакет', date: 'Дата', time: 'Время', name: 'Имя и фамилия', phone: 'Телефон', description: 'Описание проекта', contact: 'Способ связи', submit: 'Отправить заявку', ready: 'Заявка принята.', required: 'Заполните обязательные поля.' },
-    contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Баку, Азербайджан' },
-    profile: { title: 'Профиль', text: 'Авторизация и личный кабинет будут подключены на следующем этапе через Supabase.' }
+    booking: { title: 'Отправить заявку на проект', text: 'Выберите услугу и оставьте контакты. Команда свяжется с вами, уточнит детали и сама назначит удобное время.', service: 'Услуга или пакет', name: 'Имя и фамилия', email: 'Email (необязательно)', phone: 'Телефон', description: 'Что вы хотите сделать?', descriptionPlaceholder: 'Опишите проект, трек, референсы, нужную услугу и важные детали.', contact: 'Как с вами связаться', call: 'Позвонить', submit: 'Отправить', ready: 'Заявка отправлена.', required: 'Заполните обязательные поля.' },
+    contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Баку, Азербайджан' }
   },
   en: {
     meta: {
       title: 'Duomo Records',
       description: 'Duomo Records — music production, recording, mix/mastering, media and creative services.'
     },
-    nav: { home: 'Home', services: 'Services', projects: 'Projects', media: 'Media', blog: 'Blog', courses: 'Courses', booking: 'Booking', profile: 'Profile', menu: 'Menu' },
+    nav: { home: 'Home', services: 'Services', projects: 'Projects', media: 'Media', blog: 'Blog', courses: 'Courses', booking: 'Booking', menu: 'Menu' },
     hero: {
       eyebrow: 'MUSIC PRODUCTION STUDIO',
       title: 'Designing sound from first idea to final release',
-      text: 'DUOMO Records combines music production, recording, mix/mastering, videos, reels, and release visuals in one production system.',
+      text: 'DUOMO Records helps artists and brands turn ideas into finished sound, visuals, and release content.',
       primary: 'Prepare booking',
       secondary: 'View projects',
       scroll: 'Scroll'
     },
-    labels: { theme: 'Toggle theme', language: 'Choose language', readMore: 'Read', book: 'Book', bookService: 'Choose service', bookPackage: 'Choose package', viewAll: 'View all', share: 'Share', backToBlog: 'Back to blog', placeholder: 'Coming next stage' },
+    labels: { theme: 'Toggle theme', language: 'Choose language', readMore: 'Read', book: 'Book', bookService: 'Choose service', bookPackage: 'Choose package', viewAll: 'View all', share: 'Share', backToBlog: 'Back to blog', placeholder: 'Coming next stage', bestSeller: 'Best seller', learnMore: 'Learn more', bookAcademy: 'Book Academy course' },
     sections: { services: 'Services', packages: 'Packages', portfolio: 'Portfolio', about: 'About', artists: 'Artists / Clients', partners: 'Partners', process: 'Work process', courses: 'Courses preview', media: 'Media projects', blog: 'Blog', instagram: 'Instagram', booking: 'Booking', contacts: 'Contacts' },
     services: [
       { id: 'music-production', category: 'Studio', title: 'Music Production', text: 'Arrangement, beats, topline, and release-ready production.' },
@@ -251,18 +249,17 @@ export const siteContent = {
       { id: 'music-videos', category: 'Video', title: 'Music Videos / Clips', text: 'Concept, filming, editing, and release visual packages.' },
       { id: 'reels', category: 'Social', title: 'Reels', text: 'Short rhythmic video content for artists and brands.' },
       { id: 'graphic-design', category: 'Visual', title: 'Graphic Design', text: 'Cover art, logos, banners, promo and campaign visuals.' },
-      { id: 'courses', category: 'Academy', title: 'Courses', text: 'Production, audio engineering, and arrangement modules.' }
+      { id: 'courses', category: 'Academy', title: 'DUOMO Academy', text: 'Hands-on courses in production, recording, mixing, and arrangement.' }
     ],
     packageIntro: 'Prices are mock data and will become a Supabase-managed catalog later.',
     about: { lead: 'DUOMO is a Baku-based production studio connecting sound, visuals, and media cadence inside one team.', facts: ['Pop, R&B, EDM, hip-hop', 'Recording + post-production', 'Media and release support'] },
     artists: [{ name: 'Ayla', role: 'Vocal production' }, { name: 'RZ Project', role: 'Mix & mastering' }, { name: 'NOVA', role: 'Visual direction' }],
     process: ['Request', 'Brief and references', 'Recording / production', 'Mix & Master', 'Revisions', 'Final transfer / release'],
-    courses: { title: 'DUOMO Academy', text: 'The frontend place for course modules is ready. Auth, profile, and payment come later.' },
+    courses: { title: 'DUOMO Academy', text: 'Hands-on lessons for recording, production, arrangement, and mix/mastering. The course flow follows a real studio workflow with practical project tasks.' },
     mediaProjects: { title: 'Media Projects', text: 'Sessions, backstage, reels, and special media formats.', items: ['Behind The Session', 'Live Vocal Direction', 'Clip Moodboard'] },
     blogPosts: [],
-    booking: { title: 'Prepare a project request', text: 'Choose a date, review available slots, and send the request to the DUOMO booking system.', service: 'Service or package', date: 'Date', time: 'Time', name: 'Full name', phone: 'Phone', description: 'Project description', contact: 'Preferred contact', submit: 'Send request', ready: 'Booking request received.', required: 'Please fill in all required fields.' },
-    contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Baku, Azerbaijan' },
-    profile: { title: 'Profile', text: 'Authorization and personal account will be connected with Supabase at the next stage.' }
+    booking: { title: 'Send a project request', text: 'Choose a service and leave your contacts. The team will call you back, clarify the details, and schedule the right time.', service: 'Service or package', name: 'Full name', email: 'Email (optional)', phone: 'Phone', description: 'What do you want to do?', descriptionPlaceholder: 'Describe the project, track, references, needed service, and important details.', contact: 'Preferred contact', call: 'Call', submit: 'Send', ready: 'Request sent.', required: 'Please fill in all required fields.' },
+    contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Baku, Azerbaijan' }
   }
 };
 

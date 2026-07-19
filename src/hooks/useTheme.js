@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 
-const STORAGE_KEY = 'duomo-theme';
+const STORAGE_KEY = 'duomo-theme-v2';
 
 function getInitialTheme() {
   if (typeof window === 'undefined') {
     return 'light';
   }
 
-  return localStorage.getItem(STORAGE_KEY) || 'light';
+  return localStorage.getItem(STORAGE_KEY) || 'dark';
 }
 
 export function useTheme() {
@@ -17,7 +17,7 @@ export function useTheme() {
     document.documentElement.dataset.theme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute(
       'content',
-      theme === 'dark' ? '#181817' : '#f6f1e8'
+      theme === 'dark' ? '#080808' : '#f6f1e8'
     );
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);

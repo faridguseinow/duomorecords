@@ -16,13 +16,8 @@ function safeTrim(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
-export function validateBookingPayload(payload, availableSlots = [], maximumAdvanceDays = 90) {
+export function validateBookingPayload(payload) {
   const errors = {};
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const maxDate = new Date(today);
-  maxDate.setDate(maxDate.getDate() + maximumAdvanceDays);
-  const bookingDate = payload.bookingDate ? new Date(`${payload.bookingDate}T00:00:00`) : null;
 
   if (!payload.serviceId && !payload.packageId) {
     errors.selectedOption = 'Select a service or package.';
@@ -42,14 +37,6 @@ export function validateBookingPayload(payload, availableSlots = [], maximumAdva
 
   if (payload.projectDescription && payload.projectDescription.length > 3000) {
     errors.projectDescription = 'Project description is too long.';
-  }
-
-  if (!bookingDate || Number.isNaN(bookingDate.getTime()) || bookingDate < today || bookingDate > maxDate) {
-    errors.bookingDate = 'Choose a valid available date.';
-  }
-
-  if (!payload.bookingTime || (availableSlots.length > 0 && !availableSlots.includes(payload.bookingTime))) {
-    errors.bookingTime = 'Choose an available time slot.';
   }
 
   if (!PREFERRED_CONTACT_TYPES.includes(payload.preferredContact)) {
@@ -119,8 +106,8 @@ export async function createPublicBooking(payload) {
       supabase.rpc('create_public_booking', {
         input_service_id: payload.serviceDbId || null,
         input_package_id: payload.packageDbId || null,
-        input_booking_date: payload.bookingDate,
-        input_booking_time: payload.bookingTime,
+        input_booking_date: payload.bookingDate || null,
+        input_booking_time: payload.bookingTime || null,
         input_customer_name: payload.customerName,
         input_customer_email: payload.customerEmail || null,
         input_customer_phone: payload.phone,
