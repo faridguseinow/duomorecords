@@ -40,6 +40,25 @@ import { getLocalizedValue } from './utils/localization';
 
 const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })));
+const LANGUAGE_TRANSITION_KEY = 'duomo-language-transition';
+const LANGUAGE_LOADER_EVENT = 'duomo-language-loader';
+
+function showLanguageLoader(duration = 3600) {
+  window.dispatchEvent(new CustomEvent(LANGUAGE_LOADER_EVENT, { detail: { duration } }));
+}
+
+function consumeLanguageTransition() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const hasTransition = window.sessionStorage.getItem(LANGUAGE_TRANSITION_KEY) === '1';
+  if (hasTransition) {
+    window.sessionStorage.removeItem(LANGUAGE_TRANSITION_KEY);
+  }
+
+  return hasTransition;
+}
 
 function getLangPath(pathname, nextLang) {
   const parts = pathname.split('/').filter(Boolean);
@@ -61,6 +80,43 @@ function setPageMeta(lang, title, description) {
   document.documentElement.lang = lang;
   document.title = title;
   document.querySelector('meta[name="description"]')?.setAttribute('content', description);
+}
+
+function SiteLoader({ className = '', onComplete }) {
+  const completedRef = useRef(false);
+
+  useEffect(() => {
+    completedRef.current = false;
+    const fallback = window.setTimeout(() => {
+      if (!completedRef.current) {
+        completedRef.current = true;
+        onComplete?.();
+      }
+    }, 3600);
+
+    return () => window.clearTimeout(fallback);
+  }, [onComplete]);
+
+  const complete = () => {
+    if (!completedRef.current) {
+      completedRef.current = true;
+      onComplete?.();
+    }
+  };
+
+  return (
+    <div className={`site-loader ${className}`.trim()} aria-hidden="true">
+      <video
+        src={duomoIntroVideo}
+        autoPlay
+        muted
+        playsInline
+        preload="auto"
+        onEnded={complete}
+        onError={complete}
+      />
+    </div>
+  );
 }
 
 function Flag({ code }) {
@@ -127,9 +183,9 @@ function SiteHeader({ lang, content, theme, onThemeToggle, onBookingOpen }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [languageOpen, setLanguageOpen] = useState(false);
-  const [languageLoading, setLanguageLoading] = useState(false);
   const menuRef = useRef(null);
   const languageRef = useRef(null);
+  const languageTimersRef = useRef([]);
 
   const links = [
     { label: content.sections.portfolio, to: `/${lang}/portfolio`, kind: 'route' },
@@ -172,6 +228,13 @@ function SiteHeader({ lang, content, theme, onThemeToggle, onBookingOpen }) {
     }
   }, [open]);
 
+  useEffect(() => (
+    () => {
+      languageTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+      languageTimersRef.current = [];
+    }
+  ), []);
+
   const handleLanguageSelect = (event, code) => {
     event.preventDefault();
     if (code === lang) {
@@ -180,18 +243,16 @@ function SiteHeader({ lang, content, theme, onThemeToggle, onBookingOpen }) {
     }
 
     setLanguageOpen(false);
-    setLanguageLoading(true);
-    window.setTimeout(() => navigate(getLangPath(location.pathname, code)), 650);
-    window.setTimeout(() => setLanguageLoading(false), 1500);
+    window.sessionStorage.setItem(LANGUAGE_TRANSITION_KEY, '1');
+    showLanguageLoader();
+    languageTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    languageTimersRef.current = [
+      window.setTimeout(() => navigate(getLangPath(location.pathname, code)), 750)
+    ];
   };
 
   return (
     <header className="site-header">
-      {languageLoading && (
-        <div className="intro-overlay language-loading" aria-hidden="true">
-          <video src={duomoIntroVideo} autoPlay muted playsInline preload="auto" />
-        </div>
-      )}
       <div className="nav-shell">
         <Link to={`/${lang}`} className="brand" aria-label="DUOMO Records home">
           <span className="brand-mark">
@@ -373,7 +434,11 @@ function HomePage({ theme, onThemeToggle }) {
   const { data: homepage, loading: homepageLoading, error: homepageError } = useSiteContent(lang);
   const { posts: previewPosts, loading: blogPreviewLoading } = useBlogPosts(lang);
   const [bookingModal, setBookingModal] = useState({ open: false, selected: '' });
-  const [heroReady, setHeroReady] = useState(false);
+  const skipInitialIntroRef = useRef(null);
+  if (skipInitialIntroRef.current === null) {
+    skipInitialIntroRef.current = consumeLanguageTransition();
+  }
+  const [heroReady, setHeroReady] = useState(() => skipInitialIntroRef.current);
   useReveal();
 
   useEffect(() => {
@@ -383,6 +448,17 @@ function HomePage({ theme, onThemeToggle }) {
   }, [content, invalid, lang]);
 
   useEffect(() => {
+    if (skipInitialIntroRef.current) {
+      skipInitialIntroRef.current = false;
+      setHeroReady(true);
+      return undefined;
+    }
+
+    if (consumeLanguageTransition()) {
+      setHeroReady(true);
+      return undefined;
+    }
+
     setHeroReady(false);
     const fallback = window.setTimeout(() => setHeroReady(true), 3600);
     return () => window.clearTimeout(fallback);
@@ -403,6 +479,8 @@ function HomePage({ theme, onThemeToggle }) {
   const partners = homepage.partners || [];
   const processSteps = homepage.processSteps || [];
   const instagramPosts = homepage.instagramPosts || [];
+  const contactInformation = homepage.contactInformation || content.contacts;
+  const socialLinks = homepage.socialLinks || {};
   const hasContentWarning = homepageError || Object.values(homepage.errors || {}).some(Boolean);
   const sectionMap = Object.fromEntries((homepage.sections || []).map((section) => [section.section_key, section]));
   const isSectionVisible = (key) => !homepage.sections?.length || sectionMap[key]?.is_visible !== false;
@@ -460,43 +538,32 @@ function HomePage({ theme, onThemeToggle }) {
   };
 
   return (
-    <div className={`app-shell ${heroReady ? 'site-ready' : 'site-intro-active'}`}>
-      {!heroReady && (
-        <div className="intro-overlay" aria-hidden="true" onAnimationEnd={() => setHeroReady(true)}>
-          <video
-            src={duomoIntroVideo}
-            autoPlay
-            muted
-            playsInline
-            preload="auto"
-            onEnded={() => setHeroReady(true)}
-            onError={() => setHeroReady(true)}
-          />
-        </div>
-      )}
-      <SiteHeader lang={lang} content={content} theme={theme} onThemeToggle={onThemeToggle} onBookingOpen={() => openBookingModal()} />
-      <main>
-        <section className={`hero-section ${heroReady ? 'ready' : ''}`}>
-          <div className="hero-grid">
-            <div className="hero-copy">
-              <h1>{content.hero.title}</h1>
-              <p>{content.hero.text}</p>
-              <div className="hero-actions">
-                <button type="button" className="button primary" onClick={() => openBookingModal()}>
-                  {content.hero.primary}
-                </button>
-                <a href="#portfolio" className="button ghost">{content.hero.secondary}</a>
+    <>
+      {!heroReady && <SiteLoader onComplete={() => setHeroReady(true)} />}
+      <div className={`app-shell ${heroReady ? 'site-ready' : 'site-intro-active'}`}>
+        <SiteHeader lang={lang} content={content} theme={theme} onThemeToggle={onThemeToggle} onBookingOpen={() => openBookingModal()} />
+        <main>
+          <section className={`hero-section ${heroReady ? 'ready' : ''}`}>
+            <div className="hero-grid">
+              <div className="hero-copy">
+                <h1>{content.hero.title}</h1>
+                <p>{content.hero.text}</p>
+                <div className="hero-actions">
+                  <button type="button" className="button primary" onClick={() => openBookingModal()}>
+                    {content.hero.primary}
+                  </button>
+                  <a href="#portfolio" className="button ghost">{content.hero.secondary}</a>
+                </div>
               </div>
-            </div>
-            <div className="hero-record-wrap" aria-hidden="true">
-              <div className="vinyl-record">
-                <div className="record-label">
-                  <img src={duomoLogoPng} alt="" width="112" height="112" />
+              <div className="hero-record-wrap" aria-hidden="true">
+                <div className="vinyl-record">
+                  <div className="record-label">
+                    <img src={duomoLogoPng} alt="" width="112" height="112" />
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
 
         {isSectionVisible('services') && <section id="services" className="wide-section services-section" data-reveal>
           <SectionIntro title={sectionTitle('services', content.sections.services)} />
@@ -685,7 +752,7 @@ function HomePage({ theme, onThemeToggle }) {
           </div>
         </section>}
 
-        {isSectionVisible('contacts') && <ContactFooter lang={lang} content={content} />}
+        {isSectionVisible('contacts') && <ContactFooter lang={lang} content={content} contacts={contactInformation} socialLinks={socialLinks} />}
       </main>
       <BookingModal
         open={bookingModal.open}
@@ -697,7 +764,8 @@ function HomePage({ theme, onThemeToggle }) {
         packages={packages}
       />
       <MobileBottomNav lang={lang} content={content} onBookingOpen={() => openBookingModal()} />
-    </div>
+      </div>
+    </>
   );
 }
 
@@ -705,12 +773,14 @@ function BookingModal({ open, onClose, initialSelected, lang, content, services,
   const dialogRef = useRef(null);
   const [selectedOption, setSelectedOption] = useState(initialSelected || '');
   const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [successBookingNumber, setSuccessBookingNumber] = useState('');
   const createBooking = useCreateBooking();
 
   useEffect(() => {
     if (open) {
       setSelectedOption(initialSelected || '');
       setStatus({ type: 'idle', message: '' });
+      setSuccessBookingNumber('');
       document.body.classList.add('modal-open');
       window.setTimeout(() => dialogRef.current?.querySelector('select, input, textarea, button')?.focus(), 0);
     } else {
@@ -752,10 +822,8 @@ function BookingModal({ open, onClose, initialSelected, lang, content, services,
     });
 
     if (result.ok) {
-      setStatus({
-        type: 'ready',
-        message: `${content.booking.ready} ${result.booking?.booking_number ? `#${result.booking.booking_number}` : ''}`
-      });
+      setStatus({ type: 'ready', message: '' });
+      setSuccessBookingNumber(result.booking?.booking_number || '');
       form.reset();
       setSelectedOption('');
       return;
@@ -784,6 +852,22 @@ function BookingModal({ open, onClose, initialSelected, lang, content, services,
             <X aria-hidden="true" className="icon" />
           </button>
         </div>
+        {status.type === 'ready' ? (
+          <div className="booking-success" role="status" aria-live="polite">
+            <div className="booking-success-mark">✓</div>
+            <h3>{content.booking.successTitle || content.booking.ready}</h3>
+            <p>{content.booking.successText || content.booking.text}</p>
+            {successBookingNumber && (
+              <div className="booking-success-number">
+                <span>{content.booking.requestNumber || 'Request number'}</span>
+                <strong>#{successBookingNumber}</strong>
+              </div>
+            )}
+            <button type="button" className="button primary" onClick={onClose}>
+              {content.booking.close || 'Close'}
+            </button>
+          </div>
+        ) : (
         <form className="booking-form" onSubmit={handleSubmit} noValidate>
           <label>
             {content.booking.service}
@@ -822,27 +906,33 @@ function BookingModal({ open, onClose, initialSelected, lang, content, services,
             <textarea name="projectDescription" rows="6" placeholder={content.booking.descriptionPlaceholder} />
           </label>
           <button className="button primary" type="submit" disabled={createBooking.loading}>
-            {createBooking.loading ? 'Sending...' : content.booking.submit}
+            {createBooking.loading ? content.booking.sending || content.booking.submit : content.booking.submit}
           </button>
           <p id="booking-status" className={`form-status ${status.type}`} aria-live="polite">
             {status.message}
           </p>
         </form>
+        )}
       </section>
     </div>
   );
 }
 
-function ContactFooter({ lang, content }) {
+function ContactFooter({ lang, content, contacts, socialLinks }) {
+  const whatsapp = String(contacts?.whatsapp || contacts?.phone || content.contacts.whatsapp);
+  const instagram = contacts?.instagram || content.contacts.instagram;
+  const address = getLocalizedValue(contacts?.address, lang) || content.contacts.address;
+  const instagramUrl = socialLinks?.instagram || 'https://instagram.com/duomorecords';
+
   return (
     <footer id="contact" className="site-footer" data-reveal>
       <div>
         <h2>{content.sections.contacts}</h2>
       </div>
       <address>
-        <a href={`https://wa.me/${content.contacts.whatsapp.replace(/\D/g, '')}`}>{content.contacts.whatsapp}</a>
-        <a href="https://instagram.com/duomorecords" target="_blank" rel="noopener noreferrer">{content.contacts.instagram}</a>
-        <span>{content.contacts.address}</span>
+        <a href={`https://wa.me/${whatsapp.replace(/\D/g, '')}`}>{whatsapp}</a>
+        <a href={instagramUrl} target="_blank" rel="noopener noreferrer">{instagram}</a>
+        <span>{address}</span>
       </address>
     </footer>
   );
@@ -1154,9 +1244,27 @@ function AcademyPage({ theme, onThemeToggle }) {
 
 export default function App() {
   const { theme, toggleTheme } = useTheme();
+  const [languageLoaderActive, setLanguageLoaderActive] = useState(false);
+
+  useEffect(() => {
+    let timer;
+
+    function onLanguageLoader(event) {
+      window.clearTimeout(timer);
+      setLanguageLoaderActive(true);
+      timer = window.setTimeout(() => setLanguageLoaderActive(false), event.detail?.duration || 3600);
+    }
+
+    window.addEventListener(LANGUAGE_LOADER_EVENT, onLanguageLoader);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(LANGUAGE_LOADER_EVENT, onLanguageLoader);
+    };
+  }, []);
 
   return (
     <>
+      {languageLoaderActive && <SiteLoader onComplete={() => setLanguageLoaderActive(false)} />}
       <Routes>
         <Route path="/" element={<Navigate to="/az" replace />} />
         <Route path="/:lang" element={<HomePage theme={theme} onThemeToggle={toggleTheme} />} />
@@ -1170,7 +1278,7 @@ export default function App() {
           path="/:lang/admin/login"
           element={
             <AdminAuthProvider>
-              <Suspense fallback={<div className="admin-auth-screen">Loading...</div>}>
+              <Suspense fallback={<div className="admin-auth-screen">Загрузка...</div>}>
                 <AdminLoginPage />
               </Suspense>
             </AdminAuthProvider>
@@ -1181,8 +1289,8 @@ export default function App() {
           element={
             <AdminAuthProvider>
               <AdminProtectedRoute>
-                <Suspense fallback={<div className="admin-auth-screen">Loading...</div>}>
-                  <AdminApp />
+                <Suspense fallback={<div className="admin-auth-screen">Загрузка...</div>}>
+                  <AdminApp theme={theme} onThemeToggle={toggleTheme} />
                 </Suspense>
               </AdminProtectedRoute>
             </AdminAuthProvider>

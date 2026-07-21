@@ -13,7 +13,7 @@ export function AdminLoginPage() {
     const formData = new FormData(event.currentTarget);
     const result = await signIn(formData.get('email'), formData.get('password'));
     if (!result.ok) {
-      setError(result.error?.message || 'Invalid login');
+      setError(result.error?.message || 'Неверный логин или пароль');
     }
   }
 
@@ -24,18 +24,18 @@ export function AdminLoginPage() {
   return (
     <main className="admin-login">
       <form onSubmit={handleSubmit}>
-        <h1>DUOMO Admin</h1>
+        <h1>DUOMO Админка</h1>
         <label>
           Email
           <input name="email" type="email" autoComplete="email" required />
         </label>
         <label>
-          Password
+          Пароль
           <input name="password" type="password" autoComplete="current-password" required />
         </label>
         {error && <p className="admin-error">{error}</p>}
         <button type="submit" className="admin-primary-btn" disabled={loading}>
-          {loading ? 'Signing in...' : 'Sign in'}
+          {loading ? 'Вход...' : 'Войти'}
         </button>
       </form>
     </main>

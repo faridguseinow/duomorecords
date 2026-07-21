@@ -21,6 +21,10 @@ function normalizeError(error) {
   if (error.code === '23505') return new Error('Duplicate value. Check slug or unique field.');
   if (error.code === '42501') return new Error('Access denied by RLS policy.');
   if (error.message?.includes('invalid input syntax')) return new Error('Invalid field value.');
+  if (error.message?.includes('slot_unavailable')) return new Error('Это время уже занято или недоступно по расписанию.');
+  if (error.message?.includes('booking_is_final')) return new Error('Финальную заявку нельзя изменить.');
+  if (error.message?.includes('invalid_status_transition')) return new Error('Такой переход статуса недоступен.');
+  if (error.message?.includes('admin_access_required')) return new Error('Недостаточно прав администратора.');
   return error;
 }
 
@@ -38,6 +42,14 @@ export async function listResource(config, { page = 1, pageSize = 20, search = '
     if (value !== '' && value != null) {
       query = query.eq(key, value);
     }
+  });
+
+  Object.entries(config.fixedFilters || {}).forEach(([key, value]) => {
+    query = query.eq(key, value);
+  });
+
+  Object.entries(config.notFilters || {}).forEach(([key, value]) => {
+    query = query.neq(key, value);
   });
 
   const orderColumn = sortKey && !sortKey.includes('.') ? sortKey : config.order || 'created_at';
@@ -128,7 +140,7 @@ export async function updateBookingStatus(bookingId, status, note) {
     new_status: status,
     note: note || null
   });
-  if (error) throw error;
+  if (error) throw normalizeError(error);
   return data;
 }
 
@@ -136,10 +148,10 @@ export async function rescheduleBooking(bookingId, date, time, note) {
   const { data, error } = await supabase.rpc('reschedule_booking', {
     booking_id: bookingId,
     new_date: date,
-    new_time: time,
+    new_time: time ? `${String(time).slice(0, 5)}:00` : null,
     note: note || null
   });
-  if (error) throw error;
+  if (error) throw normalizeError(error);
   return data;
 }
 

@@ -4,31 +4,28 @@ import { useAdminAuth } from '../../hooks/useAdminAuth';
 
 const navGroups = [
   {
-    title: 'Управление',
+    title: 'Операции',
     items: [
-      ['Dashboard', ''],
+      ['Главная доска', ''],
       ['Заявки', 'bookings'],
       ['Календарь', 'calendar'],
       ['Клиенты', 'customers'],
-      ['Медиа', 'media'],
-      ['Настройки', 'settings'],
-      ['Notifications', 'notifications'],
-      ['История', 'activity']
+      ['Настройки', 'settings']
     ]
   },
   {
-    title: 'Контент',
+    title: 'Данные сайта',
     items: [
-      ['Секции', 'sections'],
       ['Услуги', 'services'],
       ['Пакеты', 'packages'],
+      ['Процесс', 'process'],
       ['Проекты', 'projects'],
+      ['Портфель', 'portfolio'],
       ['Артисты', 'artists'],
       ['Партнёры', 'partners'],
-      ['Процесс', 'process'],
-      ['Курсы', 'courses'],
-      ['Блог', 'blog'],
-      ['Instagram', 'instagram']
+      ['Курсы академии', 'courses'],
+      ['Блог секция', 'blog'],
+      ['Контакты', 'contacts']
     ]
   }
 ];
@@ -64,9 +61,9 @@ export function AdminLayout() {
 
       <div className="admin-main">
         <header className="admin-topbar">
-          <button type="button" className="admin-secondary-btn mobile-only" onClick={() => setOpen(true)}>Menu</button>
+          <button type="button" className="admin-secondary-btn mobile-only" onClick={() => setOpen(true)}>Меню</button>
           <span>{user?.email}</span>
-          <button type="button" className="admin-secondary-btn" onClick={signOut}>Logout</button>
+          <button type="button" className="admin-secondary-btn" onClick={signOut}>Выйти</button>
         </header>
         <main className="admin-content">
           <Outlet />

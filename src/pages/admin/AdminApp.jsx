@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { Route, Routes, useParams } from 'react-router-dom';
 import { AdminLayout } from '../../components/admin/AdminLayout';
 import { AdminTable } from '../../components/admin/AdminTable';
@@ -18,26 +19,82 @@ import {
   listSettings,
   listTelegramDeliveryAttempts,
   listTelegramNotifications,
-  listTelegramSettings,
   rescheduleBooking,
   retryTelegramNotification,
   savePackageWithFeatures,
   saveSetting,
-  sendTelegramTestNotification,
-  updateTelegramSettings,
   updateBookingStatus,
   uploadMedia,
   upsertResource
 } from '../../services/admin/adminDataService';
-import { activityColumns, adminResources, bookingColumns, customerColumns, formatCell, getValue } from '../../config/adminTableConfigs';
+import { activityColumns, adminResources, bookingColumns, customerColumns, formatCell, getValue, statusLabels } from '../../config/adminTableConfigs';
 
 const bookingStatuses = ['new', 'confirmed', 'in_progress', 'completed', 'rejected', 'cancelled'];
+
+const bookingStatusTransitions = {
+  new: ['confirmed', 'rejected', 'cancelled'],
+  confirmed: ['in_progress', 'cancelled'],
+  in_progress: ['completed', 'cancelled'],
+  completed: [],
+  rejected: [],
+  cancelled: []
+};
+
+const bookingStatusActionLabels = {
+  confirmed: 'Подтвердить',
+  in_progress: 'Взять в работу',
+  completed: 'Завершить',
+  rejected: 'Отклонить',
+  cancelled: 'Отменить'
+};
+
+const bookingDetailLabels = {
+  customer_name: 'Имя клиента',
+  customer_phone: 'Телефон',
+  customer_email: 'Email',
+  booking_date: 'Дата',
+  booking_time: 'Время',
+  preferred_contact: 'Связь',
+  language: 'Язык',
+  source: 'Источник',
+  status: 'Статус'
+};
+
+const customerDetailLabels = {
+  full_name: 'Имя',
+  phone: 'Телефон',
+  email: 'Email',
+  preferred_contact: 'Предпочтительный контакт',
+  notes: 'Заметки'
+};
+
+const mediaFolderOptions = [
+  { value: 'site', label: 'Сайт' },
+  { value: 'projects', label: 'Проекты' },
+  { value: 'artists', label: 'Артисты' },
+  { value: 'partners', label: 'Партнёры' },
+  { value: 'blog', label: 'Блог' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'courses', label: 'Курсы' }
+];
+
+function statusOption(value) {
+  return { value, label: statusLabels[value] || value };
+}
 
 function formatLocalDate(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+function formatBookingSlot(booking) {
+  if (!booking?.booking_date || !booking?.booking_time) {
+    return 'Время не назначено';
+  }
+
+  return `${String(booking.booking_date).slice(0, 10)} · ${String(booking.booking_time).slice(0, 5)}`;
 }
 
 function usePagedData(loader, deps) {
@@ -60,7 +117,7 @@ function usePagedData(loader, deps) {
       setRows(result.rows);
       setCount(result.count);
     } catch (err) {
-      setError(err.message || 'Load failed');
+      setError(err.message || 'Не удалось загрузить данные');
     } finally {
       setLoading(false);
     }
@@ -120,25 +177,25 @@ function DashboardPage() {
 
   return (
     <section>
-      <PageHead title="Dashboard" />
+      <PageHead title="Главная доска" />
       {error && <p className="admin-error">{error}</p>}
       <div className="admin-summary-grid">
-        <div><span>New</span><strong>{summary?.newBookings ?? '—'}</strong></div>
-        <div><span>Today</span><strong>{summary?.todayBookings ?? '—'}</strong></div>
-        <div><span>Completed</span><strong>{summary?.completedBookings ?? '—'}</strong></div>
-        <div><span>Customers</span><strong>{summary?.customers ?? '—'}</strong></div>
+        <div><span>Новые</span><strong>{summary?.newBookings ?? '—'}</strong></div>
+        <div><span>Сегодня</span><strong>{summary?.todayBookings ?? '—'}</strong></div>
+        <div><span>Завершено</span><strong>{summary?.completedBookings ?? '—'}</strong></div>
+        <div><span>Клиенты</span><strong>{summary?.customers ?? '—'}</strong></div>
       </div>
       <div className="admin-dashboard-grid">
         <section>
-          <h2>Latest bookings</h2>
+          <h2>Последние заявки</h2>
           <div className="admin-list">
             {(summary?.latestBookings || []).map((booking) => (
-              <p key={booking.id}><strong>{booking.booking_number}</strong> {booking.customer_name} · {booking.status}</p>
+              <p key={booking.id}><strong>{booking.booking_number}</strong> {booking.customer_name} · {statusLabels[booking.status] || booking.status}</p>
             ))}
           </div>
         </section>
         <section>
-          <h2>Latest actions</h2>
+          <h2>Последние действия</h2>
           <div className="admin-list">
             {(summary?.activity || []).map((item) => (
               <p key={item.id}><strong>{item.action}</strong> {item.summary}</p>
@@ -158,33 +215,52 @@ function BookingsPage() {
   const [selected, setSelected] = useState(null);
   const [history, setHistory] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [actionError, setActionError] = useState('');
 
   useEffect(() => {
     if (selected?.id) {
       listBookingHistory(selected.id).then(setHistory).catch(() => setHistory([]));
+      setActionError('');
     }
   }, [selected?.id]);
 
   async function handleStatus(status) {
     setSaving(true);
+    setActionError('');
     try {
-      const note = window.prompt('Note', '') || null;
-      const updated = await updateBookingStatus(selected.id, status, note);
+      const updated = await updateBookingStatus(selected.id, status, null);
       setSelected(updated);
       await data.reload();
       setHistory(await listBookingHistory(selected.id));
+    } catch (err) {
+      setActionError(err.message || 'Не удалось обновить статус');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleReschedule(formData) {
+  async function handleSchedule(formData) {
+    const date = formData.get('date');
+    const time = formData.get('time');
+    const note = formData.get('note');
+
+    if (!date || !time) {
+      setActionError('Укажите дату и время брони.');
+      return;
+    }
+
     setSaving(true);
+    setActionError('');
     try {
-      const updated = await rescheduleBooking(selected.id, formData.get('date'), formData.get('time'), formData.get('note'));
+      let updated = await rescheduleBooking(selected.id, date, time, note);
+      if (updated.status === 'new') {
+        updated = await updateBookingStatus(updated.id, 'confirmed', note || 'Дата и время назначены администратором');
+      }
       setSelected(updated);
       await data.reload();
       setHistory(await listBookingHistory(selected.id));
+    } catch (err) {
+      setActionError(err.message || 'Не удалось назначить время');
     } finally {
       setSaving(false);
     }
@@ -212,42 +288,76 @@ function BookingsPage() {
         onSort={data.handleSort}
         onRowClick={setSelected}
         filterOptions={[
-          { key: 'status', label: 'Status', options: bookingStatuses.map((value) => ({ value, label: value })) },
-          { key: 'booking_date', label: 'Date', type: 'date' }
+          { key: 'status', label: 'Статус', options: bookingStatuses.map(statusOption) },
+          { key: 'booking_date', label: 'Дата', type: 'date' }
         ]}
       />
 
-      <FormDrawer title={selected?.booking_number || 'Booking'} open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
+      <FormDrawer title={selected?.booking_number || 'Заявка'} open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
         {selected && (
           <div className="admin-drawer-content">
+            {actionError && <p className="admin-error">{actionError}</p>}
+            <div className="admin-booking-summary">
+              <div>
+                <span>Текущий статус</span>
+                <strong>{statusLabels[selected.status] || selected.status}</strong>
+              </div>
+              <div>
+                <span>Назначенное время</span>
+                <strong>{formatBookingSlot(selected)}</strong>
+              </div>
+            </div>
             <div className="admin-detail-grid">
               {['customer_name', 'customer_phone', 'customer_email', 'booking_date', 'booking_time', 'preferred_contact', 'language', 'source', 'status'].map((key) => (
-                <p key={key}><span>{key}</span><strong>{formatCell(selected[key])}</strong></p>
+                <p key={key}><span>{bookingDetailLabels[key] || key}</span><strong>{key === 'status' ? statusLabels[selected[key]] || selected[key] : formatCell(selected[key])}</strong></p>
               ))}
-              <p className="wide"><span>Description</span><strong>{selected.project_description || '—'}</strong></p>
-              <p className="wide"><span>Notes</span><strong>{selected.admin_notes || '—'}</strong></p>
+              <p className="wide"><span>Услуга / пакет</span><strong>{selected.services?.title?.az || selected.packages?.title?.az || '—'}</strong></p>
+              <p className="wide"><span>Описание проекта</span><strong>{selected.project_description || '—'}</strong></p>
+              <p className="wide"><span>Заметки админа</span><strong>{selected.admin_notes || '—'}</strong></p>
+            </div>
+            <div className="admin-actions-panel">
+              <h3>Обработка заявки</h3>
+              <div className="admin-actions-row">
+                {(bookingStatusTransitions[selected.status] || []).map((status) => (
+                  <button key={status} type="button" className="admin-secondary-btn" disabled={saving} onClick={() => handleStatus(status)}>
+                    {bookingStatusActionLabels[status] || statusLabels[status] || status}
+                  </button>
+                ))}
+                {(bookingStatusTransitions[selected.status] || []).length === 0 && <p className="admin-muted">Для этого статуса нет дальнейших действий.</p>}
+              </div>
             </div>
             <div className="admin-actions-row">
-              {bookingStatuses.map((status) => (
-                <button key={status} type="button" className="admin-secondary-btn" disabled={saving || status === selected.status} onClick={() => handleStatus(status)}>
-                  {status}
-                </button>
-              ))}
               <a className="admin-secondary-btn" href={`https://wa.me/${String(selected.customer_phone || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">WhatsApp</a>
-              <button type="button" className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(selected.customer_phone || '')}>Copy phone</button>
-              <button type="button" className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(selected.booking_number || '')}>Copy number</button>
+              <button type="button" className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(selected.customer_phone || '')}>Копировать телефон</button>
+              <button type="button" className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(selected.booking_number || '')}>Копировать номер</button>
             </div>
-            <form className="admin-inline-form" onSubmit={(event) => { event.preventDefault(); handleReschedule(new FormData(event.currentTarget)); }}>
-              <input name="date" type="date" defaultValue={selected.booking_date} />
-              <input name="time" type="time" defaultValue={String(selected.booking_time).slice(0, 5)} />
-              <input name="note" placeholder="Reschedule note" />
-              <button className="admin-primary-btn" disabled={saving}>Reschedule</button>
+            <form className="admin-schedule-form" onSubmit={(event) => { event.preventDefault(); handleSchedule(new FormData(event.currentTarget)); }}>
+              <div className="admin-section-title">
+                <div>
+                  <h3>{selected.booking_date ? 'Изменить время брони' : 'Назначить дату и время'}</h3>
+                  <p className="admin-muted">После назначения новая заявка станет подтверждённой и появится в календаре.</p>
+                </div>
+                <button className="admin-primary-btn" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить время'}</button>
+              </div>
+              <label>
+                Дата
+                <input name="date" type="date" required defaultValue={selected.booking_date || ''} />
+              </label>
+              <label>
+                Время
+                <input name="time" type="time" required defaultValue={String(selected.booking_time || '').slice(0, 5)} />
+              </label>
+              <label className="wide">
+                Комментарий администратора
+                <textarea name="note" rows="4" placeholder="Например: согласовали по WhatsApp, клиент придёт на запись вокала." />
+              </label>
             </form>
-            <h3>History</h3>
+            <h3>История</h3>
             <div className="admin-list">
               {history.map((item) => (
                 <p key={item.id}><strong>{item.previous_status || '—'} → {item.new_status}</strong> {item.note}</p>
               ))}
+              {history.length === 0 && <p>Истории пока нет</p>}
             </div>
           </div>
         )}
@@ -286,12 +396,12 @@ function CalendarPage() {
         title="Календарь"
         actions={
           <div className="admin-actions-row">
-            <button className="admin-secondary-btn" onClick={() => setMonth(new Date())}>Today</button>
-            <button className="admin-secondary-btn" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>Prev</button>
-            <button className="admin-secondary-btn" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>Next</button>
+            <button className="admin-secondary-btn" onClick={() => setMonth(new Date())}>Сегодня</button>
+            <button className="admin-secondary-btn" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}>Назад</button>
+            <button className="admin-secondary-btn" onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}>Вперёд</button>
             <select value={status} onChange={(event) => setStatus(event.target.value)}>
-              <option value="">All statuses</option>
-              {bookingStatuses.map((item) => <option key={item} value={item}>{item}</option>)}
+              <option value="">Все статусы</option>
+              {bookingStatuses.map((item) => <option key={item} value={item}>{statusLabels[item] || item}</option>)}
             </select>
           </div>
         }
@@ -309,10 +419,10 @@ function CalendarPage() {
           );
         })}
       </div>
-      <FormDrawer title={selectedDate || 'Date'} open={Boolean(selectedDate)} onClose={() => setSelectedDate('')}>
+      <FormDrawer title={selectedDate || 'Дата'} open={Boolean(selectedDate)} onClose={() => setSelectedDate('')}>
         <div className="admin-drawer-content">
           {(byDate.get(selectedDate) || []).map((booking) => (
-            <p key={booking.id}><strong>{booking.booking_time} · {booking.booking_number}</strong> {booking.customer_name} · {booking.status}</p>
+            <p key={booking.id}><strong>{booking.booking_time} · {booking.booking_number}</strong> {booking.customer_name} · {statusLabels[booking.status] || booking.status}</p>
           ))}
         </div>
       </FormDrawer>
@@ -344,18 +454,18 @@ function CustomersPage() {
         onSort={data.handleSort}
         onRowClick={setSelected}
       />
-      <FormDrawer title={selected?.full_name || 'Customer'} open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
+      <FormDrawer title={selected?.full_name || 'Клиент'} open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
         {selected && (
           <div className="admin-drawer-content">
             {['full_name', 'phone', 'email', 'preferred_contact', 'notes'].map((key) => (
-              <p key={key}><span>{key}</span><strong>{selected[key] || '—'}</strong></p>
+              <p key={key}><span>{customerDetailLabels[key] || key}</span><strong>{selected[key] || '—'}</strong></p>
             ))}
-            <h3>Bookings</h3>
+            <h3>Заявки</h3>
             <div className="admin-list">
               {(selected.bookings || []).map((booking) => (
-                <p key={booking.id}><strong>{booking.booking_number}</strong> {booking.booking_date} · {booking.status}</p>
+                <p key={booking.id}><strong>{booking.booking_number}</strong> {booking.booking_date} · {statusLabels[booking.status] || booking.status}</p>
               ))}
-              {(selected.bookings || []).length === 0 && <p>No bookings</p>}
+              {(selected.bookings || []).length === 0 && <p>Заявок пока нет</p>}
             </div>
           </div>
         )}
@@ -387,19 +497,19 @@ function PackageFeaturesEditor({ features, onChange }) {
   return (
     <div className="admin-feature-editor">
       <div className="admin-section-title">
-        <h3>Package features</h3>
-        <button type="button" className="admin-secondary-btn" onClick={addFeature}>Add feature</button>
+        <h3>Что входит в пакет</h3>
+        <button type="button" className="admin-secondary-btn" onClick={addFeature}>Добавить пункт</button>
       </div>
       {features.map((feature, index) => (
         <div className="admin-feature-row" key={feature.id || index}>
-          <input value={feature.title?.az || ''} onChange={(event) => updateFeature(index, 'title.az', event.target.value)} placeholder="Feature AZ" />
+          <input value={feature.title?.az || ''} onChange={(event) => updateFeature(index, 'title.az', event.target.value)} placeholder="Пункт AZ" />
           <input value={feature.title?.ru || ''} onChange={(event) => updateFeature(index, 'title.ru', event.target.value)} placeholder="RU" />
           <input value={feature.title?.en || ''} onChange={(event) => updateFeature(index, 'title.en', event.target.value)} placeholder="EN" />
-          <input type="number" value={feature.sort_order ?? index * 10} onChange={(event) => updateFeature(index, 'sort_order', Number(event.target.value))} aria-label="Order" />
-          <button type="button" className="admin-secondary-btn" onClick={() => removeFeature(index)}>Delete</button>
+          <input type="number" value={feature.sort_order ?? index * 10} onChange={(event) => updateFeature(index, 'sort_order', Number(event.target.value))} aria-label="Порядок" />
+          <button type="button" className="admin-secondary-btn" onClick={() => removeFeature(index)}>Удалить</button>
         </div>
       ))}
-      {features.length === 0 && <p className="admin-muted">No features</p>}
+      {features.length === 0 && <p className="admin-muted">Пункты пакета пока не добавлены</p>}
     </div>
   );
 }
@@ -425,7 +535,10 @@ function ResourcePage({ resourceKey }) {
     setSaving(true);
     setSaveError('');
     try {
-      const payload = buildPayloadFromForm(selected || {}, fields, formData);
+      const payload = {
+        ...(config.defaultItem || {}),
+        ...buildPayloadFromForm(selected || {}, fields, formData)
+      };
       const validationError = config.validate?.(payload);
       if (validationError) {
         setSaveError(validationError);
@@ -439,7 +552,7 @@ function ResourcePage({ resourceKey }) {
       await data.reload();
       setSelected(null);
     } catch (error) {
-      setSaveError(error.message || 'Save failed');
+      setSaveError(error.message || 'Не удалось сохранить');
     } finally {
       setSaving(false);
     }
@@ -449,7 +562,7 @@ function ResourcePage({ resourceKey }) {
     <section>
       <PageHead
         title={config.title}
-        actions={<button className="admin-primary-btn" onClick={() => setSelected({})}>Create</button>}
+        actions={<button className="admin-primary-btn" onClick={() => setSelected({ ...(config.defaultItem || {}) })}>Создать</button>}
       />
       {data.error && <p className="admin-error">{data.error}</p>}
       <AdminTable
@@ -473,7 +586,7 @@ function ResourcePage({ resourceKey }) {
       />
       {saveError && <p className="admin-error">{saveError}</p>}
       <FormDrawer
-        title={selected?.id ? 'Edit' : 'Create'}
+        title={selected?.id ? 'Редактирование' : 'Создание'}
         open={Boolean(selected)}
         item={selected}
         fields={fields}
@@ -489,20 +602,20 @@ function ResourcePage({ resourceKey }) {
 const settingSections = [
   {
     key: 'contact_information',
-    title: 'Contacts',
-    description: 'Public contact details',
+    title: 'Контактные данные',
+    description: 'Публичные контакты, которые показываются на сайте',
     fields: [
-      ['phone', 'Phone'],
+      ['phone', 'Телефон'],
       ['instagram', 'Instagram'],
-      ['address.az', 'Address AZ'],
-      ['address.ru', 'Address RU'],
-      ['address.en', 'Address EN']
+      ['address.az', 'Адрес AZ'],
+      ['address.ru', 'Адрес RU'],
+      ['address.en', 'Адрес EN']
     ]
   },
   {
     key: 'social_links',
-    title: 'Social links',
-    description: 'Public social URLs',
+    title: 'Социальные ссылки',
+    description: 'Публичные ссылки на социальные сети',
     fields: [
       ['instagram', 'Instagram URL'],
       ['whatsapp', 'WhatsApp URL'],
@@ -512,26 +625,55 @@ const settingSections = [
   },
   {
     key: 'default_seo',
-    title: 'Default SEO',
-    description: 'Default public metadata',
+    title: 'SEO по умолчанию',
+    description: 'Публичные метаданные по умолчанию',
     fields: [
-      ['title.az', 'Title AZ'],
-      ['title.ru', 'Title RU'],
-      ['title.en', 'Title EN'],
-      ['description.az', 'Description AZ'],
-      ['description.ru', 'Description RU'],
-      ['description.en', 'Description EN']
+      ['title.az', 'Название AZ'],
+      ['title.ru', 'Название RU'],
+      ['title.en', 'Название EN'],
+      ['description.az', 'Описание AZ'],
+      ['description.ru', 'Описание RU'],
+      ['description.en', 'Описание EN']
     ]
   },
-  { key: 'booking', title: 'Booking', description: 'Booking UI/settings JSON', json: true },
-  { key: 'business_hours', title: 'Business hours', description: 'Business hours JSON', json: true },
-  { key: 'navigation', title: 'Navigation', description: 'Navigation labels/order JSON', json: true }
+  { key: 'booking', title: 'Заявки', description: 'JSON настроек заявок', json: true },
+  { key: 'business_hours', title: 'Рабочие часы', description: 'JSON рабочих часов', json: true },
+  { key: 'navigation', title: 'Навигация', description: 'JSON навигации', json: true }
 ];
 
-function SettingsPage() {
+const contactSections = settingSections.filter((section) => ['contact_information', 'social_links'].includes(section.key));
+
+function SettingsPage({ theme, onThemeToggle }) {
+  const isDark = theme === 'dark';
+  const toggleTheme = onThemeToggle || (() => {});
+
+  return (
+    <section>
+      <PageHead title="Настройки" />
+      <div className="admin-settings-form">
+        <section className="admin-settings-section admin-preferences-card">
+          <div>
+            <h2>Персонализация админки</h2>
+            <p className="admin-muted">Здесь будут настройки админ-панели. Пока доступен только режим оформления.</p>
+          </div>
+          <button type="button" className="admin-theme-switch" onClick={toggleTheme} aria-pressed={isDark}>
+            <span className={isDark ? 'active' : ''}>
+              <Moon aria-hidden="true" size={18} />
+              Тёмная
+            </span>
+            <span className={!isDark ? 'active' : ''}>
+              <Sun aria-hidden="true" size={18} />
+              Светлая
+            </span>
+          </button>
+        </section>
+      </div>
+    </section>
+  );
+}
+
+function ContactsPage() {
   const [values, setValues] = useState({});
-  const [telegramSettings, setTelegramSettings] = useState(null);
-  const [telegramStatus, setTelegramStatus] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -540,16 +682,10 @@ function SettingsPage() {
     setLoading(true);
     setError('');
     try {
-      const [rows, telegram, notifications] = await Promise.all([
-        listSettings(),
-        listTelegramSettings(),
-        listTelegramNotifications({ page: 1, pageSize: 1 })
-      ]);
+      const rows = await listSettings();
       setValues(Object.fromEntries(rows.map((row) => [row.setting_key, row.value || {}])));
-      setTelegramSettings(telegram);
-      setTelegramStatus(notifications.rows[0] || null);
     } catch (err) {
-      setError(err.message || 'Settings load failed');
+      setError(err.message || 'Не удалось загрузить контакты');
     } finally {
       setLoading(false);
     }
@@ -581,37 +717,12 @@ function SettingsPage() {
     setSaving(true);
     setError('');
     try {
-      for (const section of settingSections) {
-        let value = values[section.key] || {};
-        if (section.json) {
-          const raw = new FormData(event.currentTarget).get(section.key);
-          value = raw ? JSON.parse(raw) : {};
-        }
-        await saveSetting(section.key, value, section.description, true);
-      }
-      if (telegramSettings) {
-        await updateTelegramSettings(telegramSettings);
+      for (const section of contactSections) {
+        await saveSetting(section.key, values[section.key] || {}, section.description, true);
       }
       await load();
     } catch (err) {
-      setError(err.message || 'Settings save failed');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function setTelegramField(key, value) {
-    setTelegramSettings((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleTelegramTest() {
-    setSaving(true);
-    setError('');
-    try {
-      await sendTelegramTestNotification();
-      await load();
-    } catch (err) {
-      setError(err.message || 'Telegram test failed');
+      setError(err.message || 'Не удалось сохранить контакты');
     } finally {
       setSaving(false);
     }
@@ -619,79 +730,28 @@ function SettingsPage() {
 
   return (
     <section>
-      <PageHead title="Настройки" />
+      <PageHead title="Контакты" />
       {error && <p className="admin-error">{error}</p>}
       {loading ? (
-        <div className="admin-table-card">Loading...</div>
+        <div className="admin-table-card admin-loading-card">Загрузка...</div>
       ) : (
         <form className="admin-settings-form" onSubmit={handleSubmit}>
-          {settingSections.map((section) => (
+          {contactSections.map((section) => (
             <section key={section.key} className="admin-settings-section">
               <h2>{section.title}</h2>
-              {section.json ? (
-                <textarea name={section.key} rows={7} defaultValue={JSON.stringify(values[section.key] || {}, null, 2)} />
-              ) : (
-                <div className="admin-form-body">
-                  {section.fields.map(([path, label]) => (
-                    <label key={`${section.key}-${path}`}>
-                      {label}
-                      <input value={getValue(values[section.key] || {}, path) || ''} onChange={(event) => setNested(section.key, path, event.target.value)} />
-                    </label>
-                  ))}
-                </div>
-              )}
-            </section>
-          ))}
-          <section className="admin-settings-section">
-            <div className="admin-section-title">
-              <h2>Telegram notifications</h2>
-              <button type="button" className="admin-secondary-btn" disabled={saving} onClick={handleTelegramTest}>Send test notification</button>
-            </div>
-            <div className="admin-telegram-status">
-              <span className={`admin-pill ${telegramStatus?.status === 'sent' ? 'is-on' : 'is-off'}`}>
-                {telegramStatus ? `Last: ${telegramStatus.status}` : 'No notifications yet'}
-              </span>
-              {telegramStatus?.error_message && <span className="admin-error">{telegramStatus.error_message}</span>}
-            </div>
-            {telegramSettings && (
-              <div className="admin-form-body compact">
-                {[
-                  ['notifications_enabled', 'Enabled'],
-                  ['booking_created_enabled', 'New booking'],
-                  ['booking_status_enabled', 'Status updates'],
-                  ['reminders_enabled', 'Reminders'],
-                  ['daily_summary_enabled', 'Daily summary']
-                ].map(([key, label]) => (
-                  <label key={key} className="admin-check">
-                    <input type="checkbox" checked={Boolean(telegramSettings[key])} onChange={(event) => setTelegramField(key, event.target.checked)} />
+              <p className="admin-muted">{section.description}</p>
+              <div className="admin-form-body">
+                {section.fields.map(([path, label]) => (
+                  <label key={`${section.key}-${path}`}>
                     {label}
+                    <input value={getValue(values[section.key] || {}, path) || ''} onChange={(event) => setNested(section.key, path, event.target.value)} />
                   </label>
                 ))}
-                <label>
-                  First reminder after
-                  <input type="number" value={telegramSettings.reminder_after_minutes || 20} onChange={(event) => setTelegramField('reminder_after_minutes', Number(event.target.value))} />
-                </label>
-                <label>
-                  Repeat interval
-                  <input type="number" value={telegramSettings.reminder_repeat_minutes || 60} onChange={(event) => setTelegramField('reminder_repeat_minutes', Number(event.target.value))} />
-                </label>
-                <label>
-                  Active from
-                  <input type="time" value={String(telegramSettings.active_start_time || '09:00').slice(0, 5)} onChange={(event) => setTelegramField('active_start_time', event.target.value)} />
-                </label>
-                <label>
-                  Active until
-                  <input type="time" value={String(telegramSettings.active_end_time || '21:00').slice(0, 5)} onChange={(event) => setTelegramField('active_end_time', event.target.value)} />
-                </label>
-                <label>
-                  Summary time
-                  <input type="time" value={String(telegramSettings.daily_summary_time || '09:00').slice(0, 5)} onChange={(event) => setTelegramField('daily_summary_time', event.target.value)} />
-                </label>
               </div>
-            )}
-          </section>
+            </section>
+          ))}
           <div className="admin-drawer-footer inline">
-            <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Saving...' : 'Save settings'}</button>
+            <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить контакты'}</button>
           </div>
         </form>
       )}
@@ -700,13 +760,13 @@ function SettingsPage() {
 }
 
 const notificationColumns = [
-  { key: 'created_at', label: 'Date', type: 'date' },
-  { key: 'booking', label: 'Booking', render: (row) => row.bookings?.booking_number || '—', sortable: false },
-  { key: 'event_type', label: 'Event' },
-  { key: 'status', label: 'Status', type: 'badge' },
-  { key: 'attempt_count', label: 'Attempts' },
-  { key: 'telegram_message_id', label: 'Telegram message ID' },
-  { key: 'error_message', label: 'Error' }
+  { key: 'created_at', label: 'Дата', type: 'date' },
+  { key: 'booking', label: 'Заявка', render: (row) => row.bookings?.booking_number || '—', sortable: false },
+  { key: 'event_type', label: 'Событие' },
+  { key: 'status', label: 'Статус', type: 'badge' },
+  { key: 'attempt_count', label: 'Попытки' },
+  { key: 'telegram_message_id', label: 'ID сообщения Telegram' },
+  { key: 'error_message', label: 'Ошибка' }
 ];
 
 function NotificationsPage() {
@@ -732,7 +792,7 @@ function NotificationsPage() {
       await data.reload();
       setAttempts(await listTelegramDeliveryAttempts(selected.id));
     } catch (err) {
-      setError(err.message || 'Retry failed');
+      setError(err.message || 'Не удалось повторить отправку');
     } finally {
       setSaving(false);
     }
@@ -740,7 +800,7 @@ function NotificationsPage() {
 
   return (
     <section>
-      <PageHead title="Telegram notifications" />
+      <PageHead title="Telegram уведомления" />
       {data.error && <p className="admin-error">{data.error}</p>}
       <AdminTable
         id="telegram-notifications"
@@ -760,11 +820,11 @@ function NotificationsPage() {
         onSort={data.handleSort}
         onRowClick={setSelected}
         filterOptions={[
-          { key: 'status', label: 'Status', options: ['pending', 'sent', 'failed', 'skipped'].map((value) => ({ value, label: value })) },
-          { key: 'event_type', label: 'Event', options: ['booking_created', 'booking_confirmed', 'booking_rescheduled', 'booking_cancelled', 'booking_rejected', 'booking_completed', 'booking_reminder', 'daily_summary'].map((value) => ({ value, label: value })) }
+          { key: 'status', label: 'Статус', options: ['pending', 'sent', 'failed', 'skipped'].map(statusOption) },
+          { key: 'event_type', label: 'Событие', options: ['booking_created', 'booking_confirmed', 'booking_rescheduled', 'booking_cancelled', 'booking_rejected', 'booking_completed', 'booking_reminder', 'daily_summary'].map((value) => ({ value, label: value })) }
         ]}
       />
-      <FormDrawer title="Notification" open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
+      <FormDrawer title="Уведомление" open={Boolean(selected)} item={selected} onClose={() => setSelected(null)}>
         {selected && (
           <div className="admin-drawer-content">
             {error && <p className="admin-error">{error}</p>}
@@ -779,17 +839,17 @@ function NotificationsPage() {
             </div>
             <div className="admin-actions-row">
               <button type="button" className="admin-secondary-btn" disabled={saving || selected.status !== 'failed' || selected.attempt_count >= 3} onClick={handleRetry}>
-                Retry
+                Повторить
               </button>
             </div>
-            <h3>Delivery attempts</h3>
+            <h3>Попытки доставки</h3>
             <div className="admin-list">
               {attempts.map((attempt) => (
                 <p key={attempt.id}>
                   <strong>#{attempt.attempt_number} · {attempt.response_status || '—'}</strong> {attempt.error_message || JSON.stringify(attempt.response_body || {})}
                 </p>
               ))}
-              {attempts.length === 0 && <p>No attempts</p>}
+              {attempts.length === 0 && <p>Попыток пока нет</p>}
             </div>
           </div>
         )}
@@ -856,7 +916,7 @@ function MediaPage() {
         actions={
           <div className="admin-actions-row">
             <select value={folder} onChange={(event) => setFolder(event.target.value)}>
-              {['site', 'projects', 'artists', 'partners', 'blog', 'instagram', 'courses'].map((item) => <option key={item}>{item}</option>)}
+              {mediaFolderOptions.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
             </select>
             <input type="file" accept=".jpg,.jpeg,.png,.webp,.avif,.mp4,.webm" onChange={handleUpload} />
           </div>
@@ -872,8 +932,8 @@ function MediaPage() {
               <strong>{item.name}</strong>
               <span>{Math.round((item.metadata?.size || 0) / 1024)} KB</span>
               <div className="admin-actions-row">
-                <button className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(path)}>Copy path</button>
-                <button className="admin-secondary-btn" onClick={async () => { await deleteMedia(path); load(); }}>Delete</button>
+                <button className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(path)}>Копировать путь</button>
+                <button className="admin-secondary-btn" onClick={async () => { await deleteMedia(path); load(); }}>Удалить</button>
               </div>
             </article>
           );
@@ -883,7 +943,7 @@ function MediaPage() {
   );
 }
 
-export default function AdminApp() {
+export default function AdminApp({ theme, onThemeToggle }) {
   return (
     <Routes>
       <Route element={<AdminLayout />}>
@@ -892,7 +952,8 @@ export default function AdminApp() {
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="customers" element={<CustomersPage />} />
         <Route path="media" element={<MediaPage />} />
-        <Route path="settings" element={<SettingsPage />} />
+        <Route path="settings" element={<SettingsPage theme={theme} onThemeToggle={onThemeToggle} />} />
+        <Route path="contacts" element={<ContactsPage />} />
         <Route path="notifications" element={<NotificationsPage />} />
         <Route path="activity" element={<ActivityPage />} />
         {Object.keys(adminResources).map((key) => (

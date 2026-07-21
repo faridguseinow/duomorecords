@@ -136,7 +136,8 @@ export async function getHomepageContent(language) {
     partners,
     processSteps,
     instagram,
-    bookingSettings
+    bookingSettings,
+    siteSettings
   ] = await Promise.all([
     safeQuery(
       'site_sections',
@@ -214,8 +215,14 @@ export async function getHomepageContent(language) {
       null,
       () => supabase.from('booking_settings').select('*').eq('is_booking_enabled', true).limit(1).maybeSingle(),
       (row) => row
+    ),
+    safeQuery(
+      'site_settings',
+      [],
+      () => supabase.from('site_settings').select('*').in('setting_key', ['contact_information', 'social_links'])
     )
   ]);
+  const siteSettingsMap = Object.fromEntries((siteSettings.value || []).map((row) => [row.setting_key, row.value || {}]));
 
   return {
     content: fallback.content,
@@ -227,6 +234,8 @@ export async function getHomepageContent(language) {
     partners: partners.value,
     processSteps: processSteps.value,
     instagramPosts: instagram.value,
+    contactInformation: siteSettingsMap.contact_information || fallback.contactInformation,
+    socialLinks: siteSettingsMap.social_links || fallback.socialLinks,
     timeSlots: fallback.timeSlots,
     bookingSettings: bookingSettings.value,
     sections: sections.value,
@@ -240,7 +249,8 @@ export async function getHomepageContent(language) {
       partners: partners.error,
       processSteps: processSteps.error,
       instagramPosts: instagram.error,
-      bookingSettings: bookingSettings.error
+      bookingSettings: bookingSettings.error,
+      siteSettings: siteSettings.error
     }
   };
 }

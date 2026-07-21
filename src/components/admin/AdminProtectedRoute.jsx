@@ -6,7 +6,7 @@ export function AdminProtectedRoute({ children }) {
   const { loading, isAdmin, session } = useAdminAuth();
 
   if (loading) {
-    return <div className="admin-auth-screen">Loading...</div>;
+    return <div className="admin-auth-screen">Загрузка...</div>;
   }
 
   if (!session || !isAdmin) {

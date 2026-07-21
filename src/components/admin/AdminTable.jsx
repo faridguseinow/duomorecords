@@ -31,7 +31,7 @@ export function AdminTable({
   rows,
   count,
   loading,
-  emptyText = 'No data',
+  emptyText = 'Данных пока нет',
   page,
   pageSize,
   search,
@@ -107,7 +107,7 @@ export function AdminTable({
       );
     }
     if (column.type === 'boolean') {
-      return <span className={`admin-pill ${value ? 'is-on' : 'is-off'}`}>{value ? 'Yes' : 'No'}</span>;
+      return <span className={`admin-pill ${value ? 'is-on' : 'is-off'}`}>{value ? 'Да' : 'Нет'}</span>;
     }
     if (column.type === 'dateOnly') {
       return value ? String(value).slice(0, 10) : '—';
@@ -124,8 +124,8 @@ export function AdminTable({
         <input
           value={search}
           onChange={(event) => onSearch(event.target.value)}
-          placeholder="Search"
-          aria-label="Search table"
+          placeholder="Поиск"
+          aria-label="Поиск по таблице"
         />
         {filterOptions.map((filter) => (
           filter.type === 'date' ? (
@@ -154,7 +154,7 @@ export function AdminTable({
         ))}
         {actions}
         <button type="button" className="admin-secondary-btn" onClick={() => setSettingsOpen((value) => !value)}>
-          Columns
+          Колонки
         </button>
       </div>
 
@@ -171,13 +171,13 @@ export function AdminTable({
               <input
                 type="number"
                 min="80"
-                placeholder="width"
+                placeholder="ширина"
                 value={column.width || ''}
                 onChange={(event) => resizeColumn(column.key, event.target.value)}
               />
             </div>
           ))}
-          <button type="button" className="admin-secondary-btn" onClick={resetColumns}>Reset columns</button>
+          <button type="button" className="admin-secondary-btn" onClick={resetColumns}>Сбросить колонки</button>
         </div>
       )}
 
@@ -202,7 +202,7 @@ export function AdminTable({
           <tbody>
             {loading && (
               <tr>
-                <td colSpan={visibleColumns.length}>Loading...</td>
+                <td colSpan={visibleColumns.length}>Загрузка...</td>
               </tr>
             )}
             {!loading && rows.length === 0 && (
@@ -224,10 +224,10 @@ export function AdminTable({
       </div>
 
       <div className="admin-pagination">
-        <span>{count || 0} rows</span>
-        <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Prev</button>
+        <span>{count || 0} записей</span>
+        <button type="button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Назад</button>
         <span>{page} / {totalPages}</span>
-        <button type="button" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Next</button>
+        <button type="button" disabled={page >= totalPages} onClick={() => onPage(page + 1)}>Вперёд</button>
       </div>
     </div>
   );

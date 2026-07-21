@@ -19,6 +19,10 @@ export function getFallbackContent(language) {
     partners: partners.map((name) => ({ id: name, name })),
     processSteps: content.process.map((title, index) => ({ id: title, title, stepNumber: index + 1 })),
     instagramPosts,
+    contactInformation: content.contacts,
+    socialLinks: {
+      instagram: 'https://instagram.com/duomorecords'
+    },
     timeSlots,
     source: 'fallback'
   };

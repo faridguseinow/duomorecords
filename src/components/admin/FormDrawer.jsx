@@ -48,7 +48,7 @@ export function FormDrawer({ title, open, item, fields = [], children, afterFiel
   }, [open]);
 
   function handleClose() {
-    if (dirty && !window.confirm('Discard unsaved changes?')) return;
+    if (dirty && !window.confirm('Закрыть без сохранения изменений?')) return;
     setDirty(false);
     onClose();
   }
@@ -84,7 +84,7 @@ export function FormDrawer({ title, open, item, fields = [], children, afterFiel
         <label key={field.key}>
           {field.label}
           <select name={field.key} defaultValue={stringifyValue(value, field.type)} disabled={disabled} required={field.required}>
-            <option value="">Select</option>
+            <option value="">Выберите</option>
             {(field.options || []).map((option) => {
               const optionValue = typeof option === 'string' ? option : option.value;
               const optionLabel = typeof option === 'string' ? option : option.label;
@@ -153,8 +153,8 @@ export function FormDrawer({ title, open, item, fields = [], children, afterFiel
               {afterFields}
             </div>
             <div className="admin-drawer-footer">
-              <button type="button" className="admin-secondary-btn" onClick={handleClose}>Cancel</button>
-              <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
+              <button type="button" className="admin-secondary-btn" onClick={handleClose}>Отмена</button>
+              <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
             </div>
           </form>
         )}

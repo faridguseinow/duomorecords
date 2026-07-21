@@ -16,6 +16,46 @@ function safeTrim(value) {
   return String(value || '').trim().replace(/\s+/g, ' ');
 }
 
+const bookingErrorMessages = {
+  not_configured: 'Booking system is not configured yet.',
+  booking_disabled: 'Booking requests are temporarily disabled.',
+  service_or_package_required: 'Select a service or package.',
+  invalid_service: 'Selected service is unavailable. Refresh the page and try again.',
+  invalid_package: 'Selected package is unavailable. Refresh the page and try again.',
+  invalid_customer_name: 'Check the customer name.',
+  invalid_customer_phone: 'Check the phone number.',
+  invalid_customer_email: 'Check the email address.',
+  invalid_preferred_contact: 'Choose a contact method.',
+  project_description_too_long: 'Project description is too long.',
+  booking_slot_incomplete: 'Booking request cannot include an incomplete time slot.',
+  slot_unavailable: 'This booking time is unavailable.',
+  request_failed: 'Booking request failed.'
+};
+
+function normalizeBookingError(error) {
+  const message = String(error?.message || '').trim();
+  const knownCode = Object.keys(bookingErrorMessages).find((code) => message.includes(code));
+
+  if (knownCode) {
+    return {
+      code: knownCode,
+      message: bookingErrorMessages[knownCode]
+    };
+  }
+
+  if (message.toLowerCase().includes('null value in column "booking_date"')) {
+    return {
+      code: 'booking_request_schema_outdated',
+      message: 'Booking database is not ready for request-only submissions.'
+    };
+  }
+
+  return {
+    code: 'request_failed',
+    message: bookingErrorMessages.request_failed
+  };
+}
+
 export function validateBookingPayload(payload) {
   const errors = {};
 
@@ -125,11 +165,14 @@ export async function createPublicBooking(payload) {
       booking: Array.isArray(data) ? data[0] : data
     };
   } catch (error) {
-    const message = error.message || 'Booking request failed.';
+    const normalizedError = normalizeBookingError(error);
+    if (import.meta.env.DEV) {
+      console.warn('[booking create] Supabase request failed.', error);
+    }
     return {
       ok: false,
-      code: message.toLowerCase().includes('slot') ? 'slot_conflict' : 'request_failed',
-      message
+      code: normalizedError.code,
+      message: normalizedError.message
     };
   }
 }

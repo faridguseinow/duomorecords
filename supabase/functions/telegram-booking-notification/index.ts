@@ -1,5 +1,5 @@
 import { createServiceClient, jsonResponse, publicPayload, requireAdmin, requireWebhookSecret, safeErrorMessage } from '../_shared/supabase.ts';
-import { buildAdminBookingUrl, escapeTelegramHtml, normalizeWhatsappUrl, sendTelegramMessage, TelegramReplyMarkup, truncateText } from '../_shared/telegram.ts';
+import { buildAdminBookingUrl, escapeTelegramHtml, normalizeWhatsappUrl, sendTelegramMessage, truncateText, type TelegramReplyMarkup } from '../_shared/telegram.ts';
 
 type Booking = Record<string, any>;
 
@@ -42,6 +42,13 @@ function detectEvent(record: Booking, oldRecord: Booking | null, webhookType: st
   const timeChanged = record.booking_time !== oldRecord.booking_time;
   const statusChanged = record.status !== oldRecord.status;
 
+  if ((dateChanged || timeChanged) && statusChanged && record.status === 'confirmed' && !oldRecord.booking_date && !oldRecord.booking_time) {
+    return {
+      eventType: 'booking_confirmed',
+      deduplicationKey: `booking_scheduled:${record.id}:${record.booking_date}:${record.booking_time}`
+    };
+  }
+
   if (dateChanged || timeChanged) {
     return {
       eventType: 'booking_rescheduled',
@@ -66,6 +73,8 @@ function buildMessage(booking: Booking, eventType: string) {
   const pkg = localized(booking.packages?.title, booking.language);
   const title = eventType === 'booking_created' ? '🎙 <b>Новая заявка DUOMO</b>' : `🎙 <b>DUOMO — ${escapeTelegramHtml(eventLabels[eventType] || eventType)}</b>`;
   const comment = truncateText(booking.project_description, 500);
+  const bookingDate = booking.booking_date ? String(booking.booking_date).slice(0, 10) : 'Не назначено';
+  const bookingTime = booking.booking_time ? String(booking.booking_time).slice(0, 5) : 'Не назначено';
   const rows = [
     title,
     '',
@@ -75,8 +84,8 @@ function buildMessage(booking: Booking, eventType: string) {
     booking.customer_email ? `<b>Email:</b> ${escapeTelegramHtml(booking.customer_email)}` : '',
     service ? `<b>Услуга:</b> ${escapeTelegramHtml(service)}` : '',
     pkg ? `<b>Пакет:</b> ${escapeTelegramHtml(pkg)}` : '',
-    `<b>Дата:</b> ${escapeTelegramHtml(booking.booking_date)}`,
-    `<b>Время:</b> ${escapeTelegramHtml(String(booking.booking_time || '').slice(0, 5))}`,
+    `<b>Дата:</b> ${escapeTelegramHtml(bookingDate)}`,
+    `<b>Время:</b> ${escapeTelegramHtml(bookingTime)}`,
     `<b>Связь:</b> ${escapeTelegramHtml(booking.preferred_contact)}`,
     `<b>Язык:</b> ${escapeTelegramHtml(String(booking.language || '').toUpperCase())}`,
     comment ? `<b>Комментарий:</b>\n${escapeTelegramHtml(comment)}` : '',
@@ -94,7 +103,8 @@ function buildReplyMarkup(booking: Booking): TelegramReplyMarkup {
   if (adminUrl) buttons.push([{ text: 'Открыть заявку', url: adminUrl }]);
   const secondRow = [];
   if (whatsappUrl) secondRow.push({ text: 'WhatsApp', url: whatsappUrl });
-  if (booking.status === 'new') secondRow.push({ text: 'Подтвердить', callback_data: `confirm:${booking.id}` });
+  if (['new', 'confirmed'].includes(booking.status)) secondRow.push({ text: 'Выбрать дату', callback_data: `dates|${booking.id}` });
+  if (booking.status === 'new' && booking.booking_date && booking.booking_time) secondRow.push({ text: 'Подтвердить', callback_data: `confirm:${booking.id}` });
   if (secondRow.length) buttons.push(secondRow);
   return { inline_keyboard: buttons };
 }

@@ -171,7 +171,7 @@ export const siteContent = {
       }
     ],
     booking: {
-      title: 'Layihə üçün zayavka göndərin',
+      title: 'Layihə üçün sorğu göndərin',
       text: 'Xidməti seçin, əlaqə məlumatlarını yazın. Komandamız sizinlə əlaqə saxlayıb uyğun tarixi və saatı təsdiqləyəcək.',
       service: 'Xidmət və ya paket',
       name: 'Ad və soyad',
@@ -182,7 +182,12 @@ export const siteContent = {
       contact: 'Əlaqə üsulu',
       call: 'Zəng',
       submit: 'Göndər',
-      ready: 'Zayavka göndərildi.',
+      sending: 'Göndərilir...',
+      ready: 'Sorğu göndərildi.',
+      successTitle: 'Sorğunuz göndərildi',
+      successText: 'Təşəkkür edirik. Komandamız tezliklə sizinlə əlaqə saxlayacaq, detalları dəqiqləşdirəcək və uyğun vaxtı təsdiqləyəcək.',
+      requestNumber: 'Sorğu nömrəsi',
+      close: 'Bağla',
       required: 'Zəhmət olmasa bütün məcburi xanaları doldurun.'
     },
     contacts: {
@@ -223,7 +228,7 @@ export const siteContent = {
     courses: { title: 'DUOMO Academy', text: 'Практические занятия по записи, продакшну, аранжировке и mix/mastering. Обучение построено вокруг студийного workflow и реальных проектных заданий.' },
     mediaProjects: { title: 'Media Projects', text: 'Сессии, backstage, reels и специальные media-форматы.', items: ['Behind The Session', 'Live Vocal Direction', 'Clip Moodboard'] },
     blogPosts: [],
-    booking: { title: 'Отправить заявку на проект', text: 'Выберите услугу и оставьте контакты. Команда свяжется с вами, уточнит детали и сама назначит удобное время.', service: 'Услуга или пакет', name: 'Имя и фамилия', email: 'Email (необязательно)', phone: 'Телефон', description: 'Что вы хотите сделать?', descriptionPlaceholder: 'Опишите проект, трек, референсы, нужную услугу и важные детали.', contact: 'Как с вами связаться', call: 'Позвонить', submit: 'Отправить', ready: 'Заявка отправлена.', required: 'Заполните обязательные поля.' },
+    booking: { title: 'Отправить заявку на проект', text: 'Выберите услугу и оставьте контакты. Команда свяжется с вами, уточнит детали и сама назначит удобное время.', service: 'Услуга или пакет', name: 'Имя и фамилия', email: 'Email (необязательно)', phone: 'Телефон', description: 'Что вы хотите сделать?', descriptionPlaceholder: 'Опишите проект, трек, референсы, нужную услугу и важные детали.', contact: 'Как с вами связаться', call: 'Позвонить', submit: 'Отправить', sending: 'Отправляется...', ready: 'Заявка отправлена.', successTitle: 'Заявка отправлена', successText: 'Спасибо. Мы скоро свяжемся с вами, уточним детали и сами назначим удобное время.', requestNumber: 'Номер заявки', close: 'Закрыть', required: 'Заполните обязательные поля.' },
     contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Баку, Азербайджан' }
   },
   en: {
@@ -258,7 +263,7 @@ export const siteContent = {
     courses: { title: 'DUOMO Academy', text: 'Hands-on lessons for recording, production, arrangement, and mix/mastering. The course flow follows a real studio workflow with practical project tasks.' },
     mediaProjects: { title: 'Media Projects', text: 'Sessions, backstage, reels, and special media formats.', items: ['Behind The Session', 'Live Vocal Direction', 'Clip Moodboard'] },
     blogPosts: [],
-    booking: { title: 'Send a project request', text: 'Choose a service and leave your contacts. The team will call you back, clarify the details, and schedule the right time.', service: 'Service or package', name: 'Full name', email: 'Email (optional)', phone: 'Phone', description: 'What do you want to do?', descriptionPlaceholder: 'Describe the project, track, references, needed service, and important details.', contact: 'Preferred contact', call: 'Call', submit: 'Send', ready: 'Request sent.', required: 'Please fill in all required fields.' },
+    booking: { title: 'Send a project request', text: 'Choose a service and leave your contacts. The team will call you back, clarify the details, and schedule the right time.', service: 'Service or package', name: 'Full name', email: 'Email (optional)', phone: 'Phone', description: 'What do you want to do?', descriptionPlaceholder: 'Describe the project, track, references, needed service, and important details.', contact: 'Preferred contact', call: 'Call', submit: 'Send', sending: 'Sending...', ready: 'Request sent.', successTitle: 'Request sent', successText: 'Thank you. We will contact you soon, clarify the details, and schedule the right time.', requestNumber: 'Request number', close: 'Close', required: 'Please fill in all required fields.' },
     contacts: { whatsapp: '+994 99 340 03 40', instagram: '@duomorecords', address: '28 May, Jalə Plaza, Baku, Azerbaijan' }
   }
 };
