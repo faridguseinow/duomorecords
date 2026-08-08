@@ -1,0 +1,11 @@
+grant delete on public.site_sections to authenticated;
+grant delete on public.services to authenticated;
+grant delete on public.packages to authenticated;
+grant delete on public.package_features to authenticated;
+grant delete on public.projects to authenticated;
+grant delete on public.artists to authenticated;
+grant delete on public.partners to authenticated;
+grant delete on public.process_steps to authenticated;
+grant delete on public.courses to authenticated;
+grant delete on public.blog_posts to authenticated;
+grant delete on public.instagram_posts to authenticated;

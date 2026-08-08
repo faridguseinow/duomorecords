@@ -37,7 +37,8 @@ const shared = {
     { id: 'ig-01', title: 'Studio session', href: 'https://instagram.com/duomorecords' },
     { id: 'ig-02', title: 'Vocal direction', href: 'https://instagram.com/duomorecords' },
     { id: 'ig-03', title: 'Mix detail', href: 'https://instagram.com/duomorecords' },
-    { id: 'ig-04', title: 'Release visual', href: 'https://instagram.com/duomorecords' }
+    { id: 'ig-04', title: 'Release visual', href: 'https://instagram.com/duomorecords' },
+    { id: 'ig-05', title: 'Backstage update', href: 'https://instagram.com/duomorecords' }
   ]
 };
 
@@ -54,14 +55,14 @@ export const siteContent = {
       media: 'Media',
       blog: 'Blog',
       courses: 'Kurslar',
-      booking: 'Bron',
+      booking: 'Bron et',
       menu: 'Menyu'
     },
     hero: {
       eyebrow: 'MUSIC PRODUCTION STUDIO',
       title: 'Səsi ideyadan final relizə qədər dizayn edirik',
       text: 'DUOMO Records artistlər və brendlər üçün ideyanı hazır səsə, vizuala və reliz kontentinə çevirir.',
-      primary: 'Bron yarat',
+      primary: 'Bron et',
       secondary: 'Layihələrə bax',
       scroll: 'Aşağı'
     },

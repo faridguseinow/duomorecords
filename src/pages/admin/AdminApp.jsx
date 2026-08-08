@@ -8,6 +8,8 @@ import {
   buildPayloadFromForm,
   defaultFieldsForResource,
   deleteMedia,
+  deleteResource,
+  getBookingSettings,
   getDashboardSummary,
   listActivity,
   listBookings,
@@ -19,10 +21,14 @@ import {
   listSettings,
   listTelegramDeliveryAttempts,
   listTelegramNotifications,
+  listTelegramSettings,
   rescheduleBooking,
   retryTelegramNotification,
   savePackageWithFeatures,
   saveSetting,
+  sendTelegramTestNotification,
+  updateBookingSettings,
+  updateTelegramSettings,
   updateBookingStatus,
   uploadMedia,
   upsertResource
@@ -522,6 +528,7 @@ function ResourcePage({ resourceKey }) {
   );
   const [selected, setSelected] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [features, setFeatures] = useState([]);
   const fields = defaultFieldsForResource(config);
@@ -555,6 +562,23 @@ function ResourcePage({ resourceKey }) {
       setSaveError(error.message || 'Не удалось сохранить');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete(row) {
+    const label = row.slug || row.slug_az || row.name || row.title?.az || row.id;
+    if (!window.confirm(`Удалить "${label}"? Это действие нельзя отменить.`)) return;
+
+    setDeleting(true);
+    setSaveError('');
+    try {
+      await deleteResource(config, row);
+      await data.reload();
+      setSelected(null);
+    } catch (error) {
+      setSaveError(error.message || 'Не удалось удалить');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -593,7 +617,9 @@ function ResourcePage({ resourceKey }) {
         afterFields={resourceKey === 'packages' ? <PackageFeaturesEditor features={features} onChange={setFeatures} /> : null}
         onClose={() => setSelected(null)}
         onSave={handleSave}
+        onDelete={selected?.id ? handleDelete : null}
         saving={saving}
+        deleting={deleting}
       />
     </section>
   );
@@ -643,9 +669,320 @@ const settingSections = [
 
 const contactSections = settingSections.filter((section) => ['contact_information', 'social_links'].includes(section.key));
 
+function setNestedValue(source, path, value) {
+  const next = { ...(source || {}) };
+  const parts = path.split('.');
+  let target = next;
+  parts.forEach((part, index) => {
+    if (index === parts.length - 1) {
+      target[part] = value;
+    } else {
+      target[part] = { ...(target[part] || {}) };
+      target = target[part];
+    }
+  });
+  return next;
+}
+
+function parseNumberList(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => Number(item.trim()))
+    .filter((item) => Number.isInteger(item));
+}
+
+function parseDateList(value) {
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function SeoSettingsPanel() {
+  const [value, setValue] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      const rows = await listSettings();
+      const row = rows.find((item) => item.setting_key === 'default_seo');
+      setValue(row?.value || {});
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить SEO настройки');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      await saveSetting('default_seo', value, 'Default SEO metadata', true);
+      setMessage('SEO настройки сохранены.');
+      await load();
+    } catch (err) {
+      setError(err.message || 'Не удалось сохранить SEO настройки');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="admin-settings-section">
+      <h2>SEO сайта</h2>
+      <p className="admin-muted">Заголовок и описание по умолчанию для главной страницы.</p>
+      {error && <p className="admin-error">{error}</p>}
+      {message && <p className="admin-muted">{message}</p>}
+      {loading ? (
+        <div className="admin-table-card admin-loading-card">Загрузка...</div>
+      ) : (
+        <form className="admin-form" onSubmit={handleSubmit}>
+          <div className="admin-form-body">
+            {['az', 'ru', 'en'].map((language) => (
+              <label key={`seo-title-${language}`}>
+                Title {language.toUpperCase()}
+                <input
+                  value={value.title?.[language] || ''}
+                  onChange={(event) => setValue((current) => setNestedValue(current, `title.${language}`, event.target.value))}
+                />
+              </label>
+            ))}
+            {['az', 'ru', 'en'].map((language) => (
+              <label key={`seo-description-${language}`}>
+                Description {language.toUpperCase()}
+                <textarea
+                  rows="3"
+                  value={value.description?.[language] || ''}
+                  onChange={(event) => setValue((current) => setNestedValue(current, `description.${language}`, event.target.value))}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="admin-drawer-footer inline">
+            <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить SEO'}</button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+function BookingSettingsPanel() {
+  const [settings, setSettings] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  async function load() {
+    setLoading(true);
+    setError('');
+    try {
+      setSettings(await getBookingSettings());
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить настройки заявок');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  function setField(key, value) {
+    setSettings((current) => ({ ...(current || {}), [key]: value }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!settings?.id) {
+      setError('Booking settings row is missing in Supabase.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      await updateBookingSettings({
+        timezone: settings.timezone || 'Asia/Baku',
+        opening_time: String(settings.opening_time || '11:00').slice(0, 5),
+        closing_time: String(settings.closing_time || '20:00').slice(0, 5),
+        slot_duration_minutes: Number(settings.slot_duration_minutes || 60),
+        minimum_advance_minutes: Number(settings.minimum_advance_minutes || 120),
+        maximum_advance_days: Number(settings.maximum_advance_days || 90),
+        working_days: Array.isArray(settings.working_days) ? settings.working_days : parseNumberList(settings.working_days),
+        disabled_dates: Array.isArray(settings.disabled_dates) ? settings.disabled_dates : parseDateList(settings.disabled_dates),
+        is_booking_enabled: Boolean(settings.is_booking_enabled)
+      });
+      setMessage('Настройки заявок сохранены.');
+      await load();
+    } catch (err) {
+      setError(err.message || 'Не удалось сохранить настройки заявок');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="admin-settings-section">
+      <h2>Заявки и расписание</h2>
+      <p className="admin-muted">Эти параметры управляют публичной формой заявки и доступными слотами.</p>
+      {error && <p className="admin-error">{error}</p>}
+      {message && <p className="admin-muted">{message}</p>}
+      {loading ? (
+        <div className="admin-table-card admin-loading-card">Загрузка...</div>
+      ) : (
+        <form className="admin-form" onSubmit={handleSubmit}>
+          <div className="admin-form-body compact">
+            <label className="admin-check">
+              <input
+                type="checkbox"
+                checked={Boolean(settings?.is_booking_enabled)}
+                onChange={(event) => setField('is_booking_enabled', event.target.checked)}
+              />
+              Заявки включены
+            </label>
+            <label>
+              Timezone
+              <input value={settings?.timezone || 'Asia/Baku'} onChange={(event) => setField('timezone', event.target.value)} />
+            </label>
+            <label>
+              Открытие
+              <input type="time" value={String(settings?.opening_time || '11:00').slice(0, 5)} onChange={(event) => setField('opening_time', event.target.value)} />
+            </label>
+            <label>
+              Закрытие
+              <input type="time" value={String(settings?.closing_time || '20:00').slice(0, 5)} onChange={(event) => setField('closing_time', event.target.value)} />
+            </label>
+            <label>
+              Длительность слота, минут
+              <input type="number" min="1" value={settings?.slot_duration_minutes || 60} onChange={(event) => setField('slot_duration_minutes', Number(event.target.value))} />
+            </label>
+            <label>
+              Минимум до заявки, минут
+              <input type="number" min="0" value={settings?.minimum_advance_minutes || 120} onChange={(event) => setField('minimum_advance_minutes', Number(event.target.value))} />
+            </label>
+            <label>
+              Максимум вперёд, дней
+              <input type="number" min="1" value={settings?.maximum_advance_days || 90} onChange={(event) => setField('maximum_advance_days', Number(event.target.value))} />
+            </label>
+            <label>
+              Рабочие дни
+              <input
+                value={(Array.isArray(settings?.working_days) ? settings.working_days : []).join(',')}
+                onChange={(event) => setField('working_days', parseNumberList(event.target.value))}
+                placeholder="1,2,3,4,5,6"
+              />
+            </label>
+            <label className="wide">
+              Отключённые даты
+              <input
+                value={(Array.isArray(settings?.disabled_dates) ? settings.disabled_dates : []).join(',')}
+                onChange={(event) => setField('disabled_dates', parseDateList(event.target.value))}
+                placeholder="2026-08-20,2026-08-21"
+              />
+            </label>
+          </div>
+          <div className="admin-drawer-footer inline">
+            <button type="submit" className="admin-primary-btn" disabled={saving || !settings?.id}>
+              {saving ? 'Сохранение...' : 'Сохранить заявки'}
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
 function SettingsPage({ theme, onThemeToggle }) {
   const isDark = theme === 'dark';
   const toggleTheme = onThemeToggle || (() => {});
+  const [telegramSettings, setTelegramSettings] = useState(null);
+  const [loadingTelegram, setLoadingTelegram] = useState(true);
+  const [savingTelegram, setSavingTelegram] = useState(false);
+  const [telegramMessage, setTelegramMessage] = useState('');
+  const [telegramError, setTelegramError] = useState('');
+
+  async function loadTelegramSettings() {
+    setLoadingTelegram(true);
+    setTelegramError('');
+    try {
+      setTelegramSettings(await listTelegramSettings());
+    } catch (err) {
+      setTelegramError(err.message || 'Не удалось загрузить Telegram настройки');
+    } finally {
+      setLoadingTelegram(false);
+    }
+  }
+
+  useEffect(() => {
+    loadTelegramSettings();
+  }, []);
+
+  function setTelegramValue(key, value) {
+    setTelegramSettings((current) => ({ ...(current || {}), [key]: value }));
+  }
+
+  async function handleTelegramSubmit(event) {
+    event.preventDefault();
+    if (!telegramSettings?.id) {
+      setTelegramError('Telegram settings row is missing in Supabase.');
+      return;
+    }
+
+    setSavingTelegram(true);
+    setTelegramError('');
+    setTelegramMessage('');
+    try {
+      await updateTelegramSettings({
+        notifications_enabled: Boolean(telegramSettings.notifications_enabled),
+        booking_created_enabled: Boolean(telegramSettings.booking_created_enabled),
+        booking_status_enabled: Boolean(telegramSettings.booking_status_enabled),
+        reminders_enabled: Boolean(telegramSettings.reminders_enabled),
+        daily_summary_enabled: Boolean(telegramSettings.daily_summary_enabled),
+        reminder_after_minutes: Number(telegramSettings.reminder_after_minutes || 20),
+        reminder_repeat_minutes: Number(telegramSettings.reminder_repeat_minutes || 60),
+        active_start_time: telegramSettings.active_start_time || '09:00',
+        active_end_time: telegramSettings.active_end_time || '21:00',
+        daily_summary_time: telegramSettings.daily_summary_time || '09:00',
+        timezone: telegramSettings.timezone || 'Asia/Baku'
+      });
+      setTelegramMessage('Telegram настройки сохранены.');
+      await loadTelegramSettings();
+    } catch (err) {
+      setTelegramError(err.message || 'Не удалось сохранить Telegram настройки');
+    } finally {
+      setSavingTelegram(false);
+    }
+  }
+
+  async function handleTelegramTest() {
+    setSavingTelegram(true);
+    setTelegramError('');
+    setTelegramMessage('');
+    try {
+      await sendTelegramTestNotification();
+      setTelegramMessage('Тестовое уведомление отправлено.');
+    } catch (err) {
+      setTelegramError(err.message || 'Не удалось отправить тестовое уведомление');
+    } finally {
+      setSavingTelegram(false);
+    }
+  }
 
   return (
     <section>
@@ -666,6 +1003,101 @@ function SettingsPage({ theme, onThemeToggle }) {
               Светлая
             </span>
           </button>
+        </section>
+
+        <SeoSettingsPanel />
+        <BookingSettingsPanel />
+
+        <section className="admin-settings-section">
+          <div className="admin-section-title">
+            <div>
+              <h2>Telegram уведомления</h2>
+              <p className="admin-muted">Настройки отправки заявок, статусов, напоминаний и дневной сводки.</p>
+            </div>
+            <button type="button" className="admin-secondary-btn" disabled={savingTelegram || loadingTelegram} onClick={handleTelegramTest}>
+              Тест
+            </button>
+          </div>
+          {telegramError && <p className="admin-error">{telegramError}</p>}
+          {telegramMessage && <p className="admin-muted">{telegramMessage}</p>}
+          {loadingTelegram ? (
+            <div className="admin-table-card admin-loading-card">Загрузка...</div>
+          ) : (
+            <form className="admin-form" onSubmit={handleTelegramSubmit}>
+              <div className="admin-form-body compact">
+                {[
+                  ['notifications_enabled', 'Уведомления включены'],
+                  ['booking_created_enabled', 'Новые заявки'],
+                  ['booking_status_enabled', 'Изменения статусов'],
+                  ['reminders_enabled', 'Напоминания'],
+                  ['daily_summary_enabled', 'Дневная сводка']
+                ].map(([key, label]) => (
+                  <label key={key} className="admin-check">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(telegramSettings?.[key])}
+                      onChange={(event) => setTelegramValue(key, event.target.checked)}
+                    />
+                    {label}
+                  </label>
+                ))}
+                <label>
+                  Напомнить через, минут
+                  <input
+                    type="number"
+                    min="1"
+                    value={telegramSettings?.reminder_after_minutes || 20}
+                    onChange={(event) => setTelegramValue('reminder_after_minutes', Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Повтор напоминания, минут
+                  <input
+                    type="number"
+                    min="1"
+                    value={telegramSettings?.reminder_repeat_minutes || 60}
+                    onChange={(event) => setTelegramValue('reminder_repeat_minutes', Number(event.target.value))}
+                  />
+                </label>
+                <label>
+                  Активно с
+                  <input
+                    type="time"
+                    value={String(telegramSettings?.active_start_time || '09:00').slice(0, 5)}
+                    onChange={(event) => setTelegramValue('active_start_time', event.target.value)}
+                  />
+                </label>
+                <label>
+                  Активно до
+                  <input
+                    type="time"
+                    value={String(telegramSettings?.active_end_time || '21:00').slice(0, 5)}
+                    onChange={(event) => setTelegramValue('active_end_time', event.target.value)}
+                  />
+                </label>
+                <label>
+                  Время сводки
+                  <input
+                    type="time"
+                    value={String(telegramSettings?.daily_summary_time || '09:00').slice(0, 5)}
+                    onChange={(event) => setTelegramValue('daily_summary_time', event.target.value)}
+                  />
+                </label>
+                <label>
+                  Timezone
+                  <input
+                    value={telegramSettings?.timezone || 'Asia/Baku'}
+                    onChange={(event) => setTelegramValue('timezone', event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="admin-drawer-footer inline">
+                <button type="submit" className="admin-primary-btn" disabled={savingTelegram || !telegramSettings?.id}>
+                  {savingTelegram ? 'Сохранение...' : 'Сохранить Telegram'}
+                </button>
+              </div>
+            </form>
+          )}
         </section>
       </div>
     </section>
@@ -890,6 +1322,7 @@ function MediaPage() {
   const [error, setError] = useState('');
 
   async function load() {
+    setError('');
     try {
       setItems(await listMedia(folder));
     } catch (err) {
@@ -904,9 +1337,24 @@ function MediaPage() {
   async function handleUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
-    await uploadMedia(file, folder);
-    event.target.value = '';
-    load();
+    setError('');
+    try {
+      await uploadMedia(file, folder);
+      event.target.value = '';
+      await load();
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить файл');
+    }
+  }
+
+  async function handleDelete(path) {
+    setError('');
+    try {
+      await deleteMedia(path);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Не удалось удалить файл');
+    }
   }
 
   return (
@@ -933,7 +1381,7 @@ function MediaPage() {
               <span>{Math.round((item.metadata?.size || 0) / 1024)} KB</span>
               <div className="admin-actions-row">
                 <button className="admin-secondary-btn" onClick={() => navigator.clipboard?.writeText(path)}>Копировать путь</button>
-                <button className="admin-secondary-btn" onClick={async () => { await deleteMedia(path); load(); }}>Удалить</button>
+                <button className="admin-secondary-btn" onClick={() => handleDelete(path)}>Удалить</button>
               </div>
             </article>
           );

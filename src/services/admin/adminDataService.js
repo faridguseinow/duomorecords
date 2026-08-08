@@ -87,6 +87,22 @@ export async function updateResource(config, id, values) {
   return data;
 }
 
+export async function deleteResource(config, row) {
+  if (!row?.id) {
+    throw new Error('Cannot delete item without id.');
+  }
+
+  const { error } = await supabase
+    .from(config.table)
+    .delete()
+    .eq('id', row.id);
+  if (error) throw normalizeError(error);
+  await logActivity('content_deleted', config.table, row.id, `Deleted ${config.title}`, {
+    slug: row.slug || row.slug_az || null,
+    title: row.title || row.name || null
+  });
+}
+
 export async function savePackageWithFeatures(config, row, features = []) {
   const packagePayload = cleanPayload(row);
   const normalizedFeatures = features
@@ -264,6 +280,34 @@ export async function saveSetting(settingKey, value, description = '', isPublic 
   return data;
 }
 
+export async function getBookingSettings() {
+  const { data, error } = await supabase
+    .from('booking_settings')
+    .select('*')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw normalizeError(error);
+  return data;
+}
+
+export async function updateBookingSettings(values) {
+  const current = await getBookingSettings();
+  if (!current?.id) {
+    throw new Error('Booking settings row is missing.');
+  }
+
+  const { data, error } = await supabase
+    .from('booking_settings')
+    .update(values)
+    .eq('id', current.id)
+    .select()
+    .single();
+  if (error) throw normalizeError(error);
+  await logActivity('booking_settings_updated', 'booking_settings', data.id, 'Updated booking settings');
+  return data;
+}
+
 export async function listTelegramSettings() {
   const { data, error } = await supabase
     .from('telegram_settings')
@@ -276,6 +320,10 @@ export async function listTelegramSettings() {
 
 export async function updateTelegramSettings(values) {
   const current = await listTelegramSettings();
+  if (!current?.id) {
+    throw new Error('Telegram settings row is missing.');
+  }
+
   const { data, error } = await supabase
     .from('telegram_settings')
     .update(values)

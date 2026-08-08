@@ -10,6 +10,8 @@ const navGroups = [
       ['Заявки', 'bookings'],
       ['Календарь', 'calendar'],
       ['Клиенты', 'customers'],
+      ['Уведомления', 'notifications'],
+      ['История действий', 'activity'],
       ['Настройки', 'settings']
     ]
   },
@@ -25,7 +27,8 @@ const navGroups = [
       ['Партнёры', 'partners'],
       ['Курсы академии', 'courses'],
       ['Блог секция', 'blog'],
-      ['Контакты', 'contacts']
+      ['Контакты', 'contacts'],
+      ['Медиа', 'media']
     ]
   }
 ];

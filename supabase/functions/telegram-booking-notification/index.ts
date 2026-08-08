@@ -1,5 +1,5 @@
 import { createServiceClient, jsonResponse, publicPayload, requireAdmin, requireWebhookSecret, safeErrorMessage } from '../_shared/supabase.ts';
-import { buildAdminBookingUrl, escapeTelegramHtml, normalizeWhatsappUrl, sendTelegramMessage, truncateText, type TelegramReplyMarkup } from '../_shared/telegram.ts';
+import { buildAdminBookingUrl, escapeTelegramHtml, normalizeWhatsappUrl, sendTelegramMessage, telegramChatIds, truncateText, type TelegramReplyMarkup } from '../_shared/telegram.ts';
 
 type Booking = Record<string, any>;
 
@@ -148,43 +148,56 @@ async function markAttempt(supabase: ReturnType<typeof createServiceClient>, not
 }
 
 async function deliverNotification(supabase: ReturnType<typeof createServiceClient>, notification: Record<string, any>, booking: Booking) {
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
-  if (!chatId) throw new Error('Telegram chat id is not configured');
+  const chatIds = telegramChatIds();
+  if (chatIds.length === 0) throw new Error('Telegram chat id is not configured');
 
   const attemptNumber = Number(notification.attempt_count || 0) + 1;
-  try {
-    const result = await sendTelegramMessage({
-      chatId,
-      text: buildMessage(booking, notification.event_type),
-      replyMarkup: buildReplyMarkup(booking)
-    });
-    await markAttempt(supabase, notification.id, attemptNumber, result.status, { ok: result.body.ok }, null);
-    await supabase
-      .from('telegram_notifications')
-      .update({
-        telegram_chat_id: chatId,
-        telegram_message_id: result.body.result?.message_id || null,
-        status: 'sent',
-        attempt_count: attemptNumber,
-        error_message: null,
-        sent_at: new Date().toISOString()
-      })
-      .eq('id', notification.id);
-    return { status: 'sent', messageId: result.body.result?.message_id || null };
-  } catch (error) {
-    const message = safeErrorMessage(error);
-    await markAttempt(supabase, notification.id, attemptNumber, null, null, message);
-    await supabase
-      .from('telegram_notifications')
-      .update({
-        telegram_chat_id: chatId,
-        status: 'failed',
-        attempt_count: attemptNumber,
-        error_message: message
-      })
-      .eq('id', notification.id);
-    return { status: 'failed', error: message };
+  const results = [];
+
+  for (const chatId of chatIds) {
+    try {
+      const result = await sendTelegramMessage({
+        chatId,
+        text: buildMessage(booking, notification.event_type),
+        replyMarkup: buildReplyMarkup(booking)
+      });
+      results.push({ chatId, status: 'sent', responseStatus: result.status, messageId: result.body.result?.message_id || null });
+    } catch (error) {
+      results.push({ chatId, status: 'failed', error: safeErrorMessage(error) });
+    }
   }
+
+  const sentResults = results.filter((result) => result.status === 'sent');
+  const failedResults = results.filter((result) => result.status === 'failed');
+  const status = sentResults.length > 0 && failedResults.length === 0 ? 'sent' : sentResults.length > 0 ? 'sent' : 'failed';
+  const errorMessage = failedResults.length ? failedResults.map((result) => `${result.chatId}: ${result.error}`).join('; ') : null;
+
+  for (const result of results) {
+    if (result.status === 'sent') {
+      await markAttempt(supabase, notification.id, attemptNumber, result.responseStatus, { ok: true, chatId: result.chatId }, null);
+    } else {
+      await markAttempt(supabase, notification.id, attemptNumber, null, { chatId: result.chatId }, result.error || 'Telegram request failed');
+    }
+  }
+
+  await supabase
+    .from('telegram_notifications')
+    .update({
+      telegram_chat_id: chatIds.join(','),
+      telegram_message_id: chatIds.length === 1 ? sentResults[0]?.messageId || null : null,
+      status,
+      attempt_count: attemptNumber,
+      error_message: errorMessage,
+      sent_at: sentResults.length > 0 ? new Date().toISOString() : null
+    })
+    .eq('id', notification.id);
+
+  return {
+    status,
+    sent: sentResults.length,
+    failed: failedResults.length,
+    errors: failedResults.map((result) => ({ chatId: result.chatId, error: result.error }))
+  };
 }
 
 async function handleRetry(request: Request, body: Record<string, any>) {
@@ -214,8 +227,8 @@ async function handleTest(request: Request) {
     return jsonResponse({ error: 'admin_access_required' }, 403);
   }
 
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
-  if (!chatId) return jsonResponse({ error: 'configuration_missing' }, 400);
+  const chatIds = telegramChatIds();
+  if (chatIds.length === 0) return jsonResponse({ error: 'configuration_missing' }, 400);
 
   const supabase = createServiceClient();
   const { data: notification, error } = await supabase
@@ -232,37 +245,51 @@ async function handleTest(request: Request) {
   if (error) throw error;
 
   const attemptNumber = 1;
-  try {
-    const result = await sendTelegramMessage({
-      chatId,
-      text: '🎙 <b>DUOMO Telegram test</b>\n\nУведомления настроены корректно.'
-    });
-    await markAttempt(supabase, notification.id, attemptNumber, result.status, { ok: result.body.ok }, null);
-    await supabase
-      .from('telegram_notifications')
-      .update({
-        telegram_chat_id: chatId,
-        telegram_message_id: result.body.result?.message_id || null,
-        status: 'sent',
-        attempt_count: attemptNumber,
-        sent_at: new Date().toISOString()
-      })
-      .eq('id', notification.id);
-    return jsonResponse({ success: true });
-  } catch (error) {
-    const message = safeErrorMessage(error);
-    await markAttempt(supabase, notification.id, attemptNumber, null, null, message);
-    await supabase
-      .from('telegram_notifications')
-      .update({
-        telegram_chat_id: chatId,
-        status: 'failed',
-        attempt_count: attemptNumber,
-        error_message: message
-      })
-      .eq('id', notification.id);
-    return jsonResponse({ success: false, error: message }, 400);
+
+  const results = [];
+  for (const chatId of chatIds) {
+    try {
+      const result = await sendTelegramMessage({
+        chatId,
+        text: '🎙 <b>DUOMO Telegram test</b>\n\nУведомления настроены корректно.'
+      });
+      results.push({ chatId, status: 'sent', responseStatus: result.status, messageId: result.body.result?.message_id || null });
+    } catch (error) {
+      results.push({ chatId, status: 'failed', error: safeErrorMessage(error) });
+    }
   }
+
+  const sentResults = results.filter((result) => result.status === 'sent');
+  const failedResults = results.filter((result) => result.status === 'failed');
+  const status = sentResults.length > 0 && failedResults.length === 0 ? 'sent' : sentResults.length > 0 ? 'sent' : 'failed';
+  const errorMessage = failedResults.length ? failedResults.map((result) => `${result.chatId}: ${result.error}`).join('; ') : null;
+
+  for (const result of results) {
+    if (result.status === 'sent') {
+      await markAttempt(supabase, notification.id, attemptNumber, result.responseStatus, { ok: true, chatId: result.chatId }, null);
+    } else {
+      await markAttempt(supabase, notification.id, attemptNumber, null, { chatId: result.chatId }, result.error || 'Telegram request failed');
+    }
+  }
+
+  await supabase
+    .from('telegram_notifications')
+    .update({
+      telegram_chat_id: chatIds.join(','),
+      telegram_message_id: chatIds.length === 1 ? sentResults[0]?.messageId || null : null,
+      status,
+      attempt_count: attemptNumber,
+      error_message: errorMessage,
+      sent_at: sentResults.length > 0 ? new Date().toISOString() : null
+    })
+    .eq('id', notification.id);
+
+  return jsonResponse({
+    success: failedResults.length === 0,
+    sent: sentResults.length,
+    failed: failedResults.length,
+    errors: failedResults.map((result) => ({ chatId: result.chatId, error: result.error }))
+  }, failedResults.length === 0 ? 200 : 400);
 }
 
 Deno.serve(async (request) => {

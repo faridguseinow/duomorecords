@@ -24,8 +24,8 @@ import {
 } from 'lucide-react';
 import { Link, Navigate, NavLink, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import duomoLogo from './assets/icons/logo_duomo_white.svg';
-import duomoLogoPng from './assets/icons/logo_duomo_white.png';
 import duomoIntroVideo from './assets/media/logoAnimations/Duomo-animated.mp4';
+import heroSectionCollage from './assets/media/logoAnimations/hero-section-collage.webp';
 import { AdminProtectedRoute } from './components/admin/AdminProtectedRoute';
 import { AdminAuthProvider } from './context/AdminAuthContext';
 import { siteContent } from './data/site';
@@ -35,6 +35,7 @@ import { useReveal } from './hooks/useReveal';
 import { useSiteContent } from './hooks/useSiteContent';
 import { useTheme } from './hooks/useTheme';
 import { normalizeBookingForm, validateBookingPayload } from './services/bookingService';
+import { getInstagramFeed } from './services/instagramFeedService';
 import { SUPPORTED_LANGUAGES } from './utils/constants';
 import { getLocalizedValue } from './utils/localization';
 
@@ -42,6 +43,7 @@ const AdminApp = lazy(() => import('./pages/admin/AdminApp'));
 const AdminLoginPage = lazy(() => import('./pages/admin/AdminLoginPage').then((module) => ({ default: module.AdminLoginPage })));
 const LANGUAGE_TRANSITION_KEY = 'duomo-language-transition';
 const LANGUAGE_LOADER_EVENT = 'duomo-language-loader';
+const INSTAGRAM_PROFILE_URL = 'https://www.instagram.com/duomorecords/';
 
 function showLanguageLoader(duration = 3600) {
   window.dispatchEvent(new CustomEvent(LANGUAGE_LOADER_EVENT, { detail: { duration } }));
@@ -384,12 +386,54 @@ function MobileBottomNav({ lang, content, onBookingOpen }) {
   );
 }
 
-function ProjectVisual({ title, tone }) {
+function ProjectVisual({ title, tone, imageUrl, playable = false }) {
   return (
     <div className={`project-visual tone-${tone}`} role="img" aria-label={`${title} visual`}>
-      <span>{title.slice(0, 2).toUpperCase()}</span>
+      {imageUrl ? (
+        <img src={imageUrl} alt="" loading="lazy" />
+      ) : (
+        <span>{title.slice(0, 2).toUpperCase()}</span>
+      )}
+      {playable && (
+        <span className="project-play" aria-hidden="true">
+          <Video className="icon" />
+        </span>
+      )}
     </div>
   );
+}
+
+function ProjectCard({ project, headingLevel = 3, className = 'project-panel content-card' }) {
+  const Heading = `h${headingLevel}`;
+  const hasLink = Boolean(project.externalUrl);
+  const visual = (
+    <ProjectVisual
+      title={project.title}
+      tone={project.tone || 'orange'}
+      imageUrl={project.imageUrl}
+      playable={hasLink}
+    />
+  );
+
+  const body = (
+    <>
+      {visual}
+      <div>
+        <Heading>{project.title}</Heading>
+        {project.description && <p>{project.description}</p>}
+      </div>
+    </>
+  );
+
+  if (hasLink) {
+    return (
+      <a className={className} href={project.externalUrl} target="_blank" rel="noopener noreferrer">
+        {body}
+      </a>
+    );
+  }
+
+  return <article className={className}>{body}</article>;
 }
 
 function SectionIntro({ title, text }) {
@@ -403,6 +447,26 @@ function SectionIntro({ title, text }) {
 
 function StateMessage({ tone = 'muted', children }) {
   return <p className={`state-message ${tone}`}>{children}</p>;
+}
+
+function mediaEmptyMessage(lang) {
+  const messages = {
+    az: 'Tezliklə burada işlər görünəcək.',
+    ru: 'Скоро здесь появятся работы.',
+    en: 'Works will appear here soon.'
+  };
+
+  return messages[lang] || messages.az;
+}
+
+function instagramIntroText(lang) {
+  const messages = {
+    az: 'Son paylaşımlar, studio günləri və release vizualları.',
+    ru: 'Последние публикации, студийные дни и релизные визуалы.',
+    en: 'Latest posts, studio days, and release visuals.'
+  };
+
+  return messages[lang] || messages.az;
 }
 
 function SkeletonRows({ count = 3 }) {
@@ -434,6 +498,8 @@ function HomePage({ theme, onThemeToggle }) {
   const { data: homepage, loading: homepageLoading, error: homepageError } = useSiteContent(lang);
   const { posts: previewPosts, loading: blogPreviewLoading } = useBlogPosts(lang);
   const [bookingModal, setBookingModal] = useState({ open: false, selected: '' });
+  const [instagramFeed, setInstagramFeed] = useState({ posts: [], profileUrl: INSTAGRAM_PROFILE_URL, source: 'fallback' });
+  const heroSectionRef = useRef(null);
   const skipInitialIntroRef = useRef(null);
   if (skipInitialIntroRef.current === null) {
     skipInitialIntroRef.current = consumeLanguageTransition();
@@ -443,9 +509,11 @@ function HomePage({ theme, onThemeToggle }) {
 
   useEffect(() => {
     if (!invalid) {
-      setPageMeta(lang, content.meta.title, content.meta.description);
+      const seoTitle = getLocalizedValue(homepage.defaultSeo?.title, lang) || content.meta.title;
+      const seoDescription = getLocalizedValue(homepage.defaultSeo?.description, lang) || content.meta.description;
+      setPageMeta(lang, seoTitle, seoDescription);
     }
-  }, [content, invalid, lang]);
+  }, [content, homepage.defaultSeo, invalid, lang]);
 
   useEffect(() => {
     if (skipInitialIntroRef.current) {
@@ -464,6 +532,50 @@ function HomePage({ theme, onThemeToggle }) {
     return () => window.clearTimeout(fallback);
   }, [lang]);
 
+  const fallbackInstagramPosts = homepage.instagramPosts || [];
+
+  useEffect(() => {
+    let active = true;
+
+    getInstagramFeed(fallbackInstagramPosts).then((feed) => {
+      if (active) {
+        setInstagramFeed(feed);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [homepage.instagramPosts]);
+
+  useEffect(() => {
+    const section = heroSectionRef.current;
+    if (!section || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return undefined;
+    }
+
+    const handlePointerMove = (event) => {
+      const bounds = section.getBoundingClientRect();
+      const x = ((event.clientX - bounds.left) / bounds.width - 0.5) * -22;
+      const y = ((event.clientY - bounds.top) / bounds.height - 0.5) * -16;
+      section.style.setProperty('--hero-parallax-x', `${x.toFixed(2)}px`);
+      section.style.setProperty('--hero-parallax-y', `${y.toFixed(2)}px`);
+    };
+
+    const resetParallax = () => {
+      section.style.setProperty('--hero-parallax-x', '0px');
+      section.style.setProperty('--hero-parallax-y', '0px');
+    };
+
+    section.addEventListener('pointermove', handlePointerMove);
+    section.addEventListener('pointerleave', resetParallax);
+
+    return () => {
+      section.removeEventListener('pointermove', handlePointerMove);
+      section.removeEventListener('pointerleave', resetParallax);
+    };
+  }, []);
+
   if (invalid) {
     return <Navigate to="/az" replace />;
   }
@@ -478,13 +590,16 @@ function HomePage({ theme, onThemeToggle }) {
   const artists = homepage.artists || [];
   const partners = homepage.partners || [];
   const processSteps = homepage.processSteps || [];
-  const instagramPosts = homepage.instagramPosts || [];
+  const instagramPosts = instagramFeed.source === 'live' ? instagramFeed.posts.slice(0, 5) : [];
+  const instagramProfileUrl = instagramFeed.profileUrl || INSTAGRAM_PROFILE_URL;
   const contactInformation = homepage.contactInformation || content.contacts;
   const socialLinks = homepage.socialLinks || {};
   const hasContentWarning = homepageError || Object.values(homepage.errors || {}).some(Boolean);
   const sectionMap = Object.fromEntries((homepage.sections || []).map((section) => [section.section_key, section]));
   const isSectionVisible = (key) => !homepage.sections?.length || sectionMap[key]?.is_visible !== false;
   const sectionTitle = (key, fallback) => getLocalizedValue(sectionMap[key]?.title, lang) || fallback;
+  const sectionText = (key, fallback = '') =>
+    getLocalizedValue(sectionMap[key]?.description, lang) || getLocalizedValue(sectionMap[key]?.subtitle, lang) || fallback;
   const processDetails = processSteps.map((step, index) => {
     const title = step.title || step;
     const descriptions = {
@@ -543,11 +658,14 @@ function HomePage({ theme, onThemeToggle }) {
       <div className={`app-shell ${heroReady ? 'site-ready' : 'site-intro-active'}`}>
         <SiteHeader lang={lang} content={content} theme={theme} onThemeToggle={onThemeToggle} onBookingOpen={() => openBookingModal()} />
         <main>
-          <section className={`hero-section ${heroReady ? 'ready' : ''}`}>
+          <section className={`hero-section ${heroReady ? 'ready' : ''}`} ref={heroSectionRef}>
+            <div className="hero-background" aria-hidden="true">
+              <img className="hero-collage" src={heroSectionCollage} alt="" width="1165" height="1292" />
+            </div>
             <div className="hero-grid">
               <div className="hero-copy">
-                <h1>{content.hero.title}</h1>
-                <p>{content.hero.text}</p>
+                <h1>{sectionTitle('hero', content.hero.title)}</h1>
+                <p>{sectionText('hero', content.hero.text)}</p>
                 <div className="hero-actions">
                   <button type="button" className="button primary" onClick={() => openBookingModal()}>
                     {content.hero.primary}
@@ -555,18 +673,11 @@ function HomePage({ theme, onThemeToggle }) {
                   <a href="#portfolio" className="button ghost">{content.hero.secondary}</a>
                 </div>
               </div>
-              <div className="hero-record-wrap" aria-hidden="true">
-                <div className="vinyl-record">
-                  <div className="record-label">
-                    <img src={duomoLogoPng} alt="" width="112" height="112" />
-                  </div>
-                </div>
-              </div>
             </div>
           </section>
 
         {isSectionVisible('services') && <section id="services" className="wide-section services-section" data-reveal>
-          <SectionIntro title={sectionTitle('services', content.sections.services)} />
+          <SectionIntro title={sectionTitle('services', content.sections.services)} text={sectionText('services')} />
           {homepageLoading && <SkeletonRows />}
           {hasContentWarning && <StateMessage>Some live content is temporarily unavailable. Fallback content is shown where needed.</StateMessage>}
           <div className="service-grid">
@@ -624,7 +735,7 @@ function HomePage({ theme, onThemeToggle }) {
         </section>}
 
         {isSectionVisible('work_process') && <section className="wide-section process-section" data-reveal>
-          <SectionIntro title={sectionTitle('work_process', content.sections.process)} />
+          <SectionIntro title={sectionTitle('work_process', content.sections.process)} text={sectionText('work_process')} />
           <ol className="process-list">
             {processDetails.map((step) => (
               <li key={step.id}>
@@ -637,7 +748,7 @@ function HomePage({ theme, onThemeToggle }) {
         </section>}
 
         {isSectionVisible('packages') && <section id="pricing" className="wide-section packages-section" data-reveal>
-          <SectionIntro title={sectionTitle('packages', content.sections.packages)} text={content.packageIntro} />
+          <SectionIntro title={sectionTitle('packages', content.sections.packages)} text={sectionText('packages', content.packageIntro)} />
           <div className="package-stack">
             {packages.map((item) => (
               <article className={`package-row ${item.featured ? 'featured' : ''}`} key={item.id}>
@@ -658,15 +769,10 @@ function HomePage({ theme, onThemeToggle }) {
         </section>}
 
         {isSectionVisible('portfolio') && <section id="portfolio" className="wide-section project-section" data-reveal>
-          <SectionIntro title={sectionTitle('portfolio', content.sections.portfolio)} />
+          <SectionIntro title={sectionTitle('portfolio', content.sections.portfolio)} text={sectionText('portfolio')} />
           <div className="preview-grid" aria-label="Project previews">
             {projects.slice(0, 3).map((project) => (
-              <article className="project-panel content-card" key={project.id}>
-                <ProjectVisual title={project.title} tone={project.tone} />
-                <div>
-                  <h3>{project.title}</h3>
-                </div>
-              </article>
+              <ProjectCard key={project.id} project={project} />
             ))}
           </div>
           <Link to={`/${lang}/portfolio`} className="section-more">
@@ -677,7 +783,7 @@ function HomePage({ theme, onThemeToggle }) {
 
         {(isSectionVisible('artists') || isSectionVisible('partners')) && <section className="wide-section split-section" data-reveal>
           <div>
-            <SectionIntro title={sectionTitle('artists', content.sections.artists)} />
+            <SectionIntro title={sectionTitle('artists', content.sections.artists)} text={sectionText('artists')} />
             <div className="people-grid">
               {artists.slice(0, 3).map((artist) => (
                 <article className="person-tile content-card" key={artist.name}>
@@ -689,7 +795,7 @@ function HomePage({ theme, onThemeToggle }) {
             </div>
           </div>
           <div>
-            <SectionIntro title={sectionTitle('partners', content.sections.partners)} />
+            <SectionIntro title={sectionTitle('partners', content.sections.partners)} text={sectionText('partners')} />
             <div className="partner-grid">
               {partners.slice(0, 6).map((partner) => <span key={partner.id || partner.name}>{partner.name || partner}</span>)}
             </div>
@@ -701,13 +807,15 @@ function HomePage({ theme, onThemeToggle }) {
         </section>}
 
         {isSectionVisible('media_projects') && <section id="media" className="wide-section media-preview-section" data-reveal>
-          <SectionIntro title={sectionTitle('media_projects', content.mediaProjects.title)} text={content.mediaProjects.text} />
+          <SectionIntro title={sectionTitle('media_projects', content.mediaProjects.title)} text={sectionText('media_projects', content.mediaProjects.text)} />
+          {!homepageLoading && mediaProjects.length === 0 && <StateMessage>{mediaEmptyMessage(lang)}</StateMessage>}
           <div className="media-grid">
             {mediaProjects.slice(0, 3).map((item, index) => (
-              <article className="media-card content-card" key={item.id || item.title}>
-                <ProjectVisual title={item.title} tone={item.tone || projects[index]?.tone || 'orange'} />
-                <h3>{item.title}</h3>
-              </article>
+              <ProjectCard
+                key={item.id || item.title}
+                project={{ ...item, tone: item.tone || projects[index]?.tone || 'orange' }}
+                className="media-card content-card"
+              />
             ))}
           </div>
           <Link to={`/${lang}/media-projects`} className="section-more">
@@ -717,7 +825,7 @@ function HomePage({ theme, onThemeToggle }) {
         </section>}
 
         {isSectionVisible('blog') && <section className="wide-section blog-preview-section" data-reveal>
-          <SectionIntro title={sectionTitle('blog', content.sections.blog)} />
+          <SectionIntro title={sectionTitle('blog', content.sections.blog)} text={sectionText('blog')} />
           {blogPreviewLoading && <SkeletonRows count={2} />}
           {!blogPreviewLoading && !firstPost && <StateMessage>No published posts yet.</StateMessage>}
           {firstPost && (
@@ -740,19 +848,38 @@ function HomePage({ theme, onThemeToggle }) {
           )}
         </section>}
 
-        {isSectionVisible('instagram') && <section className="wide-section instagram-section" data-reveal>
-          <SectionIntro title={sectionTitle('instagram', content.sections.instagram)} />
+        {isSectionVisible('instagram') && instagramPosts.length > 0 && <section className="wide-section instagram-section" data-reveal>
+          <SectionIntro title={sectionTitle('instagram', content.sections.instagram)} text={sectionText('instagram', instagramIntroText(lang))} />
           <div className="instagram-grid">
-            {instagramPosts.map((post) => (
-              <a href={post.href} target="_blank" rel="noopener noreferrer" key={post.id} aria-label={post.title}>
-                <ProjectVisual title={post.title} tone="graphite" />
-                <span><Icon name="instagram" /> {post.title}</span>
+            {instagramPosts.map((post, index) => (
+              <a
+                href={post.href || instagramProfileUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                key={post.id || index}
+                aria-label={post.title}
+              >
+                <ProjectVisual title={post.title} tone="graphite" imageUrl={post.imageUrl} playable={post.mediaType === 'VIDEO'} />
+                <span className="instagram-card-title"><Icon name="instagram" /> {post.title}</span>
+                <strong className="instagram-card-cta">{content.labels.learnMore}</strong>
               </a>
             ))}
           </div>
+          <a className="instagram-follow button compact" href={instagramProfileUrl} target="_blank" rel="noopener noreferrer">
+            <Icon name="instagram" />
+            {content.contacts.instagram}
+          </a>
         </section>}
 
-        {isSectionVisible('contacts') && <ContactFooter lang={lang} content={content} contacts={contactInformation} socialLinks={socialLinks} />}
+        {isSectionVisible('contacts') && (
+          <ContactFooter
+            lang={lang}
+            content={content}
+            contacts={contactInformation}
+            socialLinks={socialLinks}
+            title={sectionTitle('contacts', content.sections.contacts)}
+          />
+        )}
       </main>
       <BookingModal
         open={bookingModal.open}
@@ -918,7 +1045,7 @@ function BookingModal({ open, onClose, initialSelected, lang, content, services,
   );
 }
 
-function ContactFooter({ lang, content, contacts, socialLinks }) {
+function ContactFooter({ lang, content, contacts, socialLinks, title }) {
   const whatsapp = String(contacts?.whatsapp || contacts?.phone || content.contacts.whatsapp);
   const instagram = contacts?.instagram || content.contacts.instagram;
   const address = getLocalizedValue(contacts?.address, lang) || content.contacts.address;
@@ -927,7 +1054,7 @@ function ContactFooter({ lang, content, contacts, socialLinks }) {
   return (
     <footer id="contact" className="site-footer" data-reveal>
       <div>
-        <h2>{content.sections.contacts}</h2>
+        <h2>{title || content.sections.contacts}</h2>
       </div>
       <address>
         <a href={`https://wa.me/${whatsapp.replace(/\D/g, '')}`}>{whatsapp}</a>
@@ -1069,12 +1196,14 @@ function MediaProjectsPage({ theme, onThemeToggle }) {
         <section className="media-grid page-grid" data-reveal>
           {loading ? <CardSkeleton count={6} /> : (
             <>
-              {homepage.mediaProjects.length === 0 && <StateMessage>No media projects published yet.</StateMessage>}
+              {homepage.mediaProjects.length === 0 && <StateMessage>{mediaEmptyMessage(lang)}</StateMessage>}
               {homepage.mediaProjects.map((item, index) => (
-            <article className="media-card content-card" key={item.id || `${item.title}-${index}`}>
-              <ProjectVisual title={item.title} tone={item.tone || 'orange'} />
-              <h2>{item.title}</h2>
-            </article>
+                <ProjectCard
+                  key={item.id || `${item.title}-${index}`}
+                  project={{ ...item, tone: item.tone || 'orange' }}
+                  headingLevel={2}
+                  className="media-card content-card"
+                />
               ))}
             </>
           )}
@@ -1113,12 +1242,7 @@ function PortfolioPage({ theme, onThemeToggle }) {
             <>
               {homepage.projects.length === 0 && <StateMessage>No projects published yet.</StateMessage>}
               {homepage.projects.map((project) => (
-            <article className="project-panel content-card" key={project.id}>
-              <ProjectVisual title={project.title} tone={project.tone} />
-              <div>
-                <h2>{project.title}</h2>
-              </div>
-            </article>
+                <ProjectCard key={project.id} project={project} headingLevel={2} />
               ))}
             </>
           )}

@@ -12,13 +12,13 @@ declare
   feature jsonb;
   saved_feature_id uuid;
   kept_feature_ids uuid[] := '{}';
-  package_id uuid := nullif(input_package->>'id', '')::uuid;
+  target_package_id uuid := nullif(input_package->>'id', '')::uuid;
 begin
   if not public.is_admin_user() then
     raise exception 'admin_access_required';
   end if;
 
-  if package_id is null then
+  if target_package_id is null then
     insert into public.packages (
       slug,
       title,
@@ -70,7 +70,7 @@ begin
         is_active = coalesce((input_package->>'is_active')::boolean, true),
         sort_order = coalesce(nullif(input_package->>'sort_order', '')::integer, 0),
         metadata = coalesce(input_package->'metadata', '{}'::jsonb)
-    where id = package_id
+    where id = target_package_id
     returning * into saved;
 
     if not found then

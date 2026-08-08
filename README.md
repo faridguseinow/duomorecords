@@ -59,7 +59,13 @@ Create `.env` from `.env.example`:
 ```bash
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
+INSTAGRAM_ACCESS_TOKEN=
+INSTAGRAM_USER_ID=
+INSTAGRAM_GRAPH_HOST=graph.instagram.com
+INSTAGRAM_GRAPH_VERSION=v23.0
 ```
+
+Instagram feed is served by `/api/instagram-feed`. Without `INSTAGRAM_ACCESS_TOKEN`, the site keeps the designed fallback cards and links to the profile.
 
 ## Run
 

@@ -9,7 +9,20 @@ function stringifyValue(value, type) {
   return String(value);
 }
 
-export function FormDrawer({ title, open, item, fields = [], children, afterFields, onClose, onSave, saving }) {
+export function FormDrawer({
+  title,
+  open,
+  item,
+  fields = [],
+  children,
+  afterFields,
+  onClose,
+  onSave,
+  onDelete,
+  saving,
+  deleting,
+  deleteLabel = 'Удалить'
+}) {
   const [dirty, setDirty] = useState(false);
   const tabs = [...new Set(fields.map((field) => field.tab).filter(Boolean))];
   const [activeTab, setActiveTab] = useState(tabs[0] || '');
@@ -153,6 +166,11 @@ export function FormDrawer({ title, open, item, fields = [], children, afterFiel
               {afterFields}
             </div>
             <div className="admin-drawer-footer">
+              {onDelete && item?.id && (
+                <button type="button" className="admin-danger-btn" onClick={() => onDelete(item)} disabled={saving || deleting}>
+                  {deleting ? 'Удаление...' : deleteLabel}
+                </button>
+              )}
               <button type="button" className="admin-secondary-btn" onClick={handleClose}>Отмена</button>
               <button type="submit" className="admin-primary-btn" disabled={saving}>{saving ? 'Сохранение...' : 'Сохранить'}</button>
             </div>

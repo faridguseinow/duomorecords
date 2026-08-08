@@ -6,6 +6,7 @@ import {
   editTelegramMessage,
   escapeTelegramHtml,
   normalizeWhatsappUrl,
+  telegramChatIds,
   truncateText,
   type TelegramReplyMarkup
 } from '../_shared/telegram.ts';
@@ -33,8 +34,9 @@ function isAllowedCallbackUser(callbackQuery: Record<string, any>) {
 }
 
 async function requireAllowedCallback(callbackQuery: Record<string, any>) {
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID') || '';
-  if (!chatId || callbackChatId(callbackQuery) !== chatId) {
+  const chatIds = telegramChatIds();
+  const chatId = callbackChatId(callbackQuery);
+  if (chatIds.length === 0 || !chatIds.includes(chatId)) {
     await answerCallbackQuery({ callbackQueryId: callbackQuery.id, text: 'Недоступно для этого чата', showAlert: true });
     return '';
   }

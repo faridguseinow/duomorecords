@@ -1,5 +1,5 @@
 import { createServiceClient, jsonResponse, publicPayload, requireAdmin, requireWebhookSecret, safeErrorMessage } from '../_shared/supabase.ts';
-import { buildAdminBookingUrl, escapeTelegramHtml, sendTelegramMessage } from '../_shared/telegram.ts';
+import { buildAdminBookingUrl, escapeTelegramHtml, sendTelegramMessage, telegramChatIds } from '../_shared/telegram.ts';
 
 function bakuParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-CA', {
@@ -77,44 +77,45 @@ async function reserve(supabase: ReturnType<typeof createServiceClient>, row: Re
 }
 
 async function sendAndLog(supabase: ReturnType<typeof createServiceClient>, notification: Record<string, any>, text: string, replyMarkup?: Record<string, unknown>) {
-  const chatId = Deno.env.get('TELEGRAM_CHAT_ID');
-  if (!chatId) throw new Error('Telegram chat id is not configured');
+  const chatIds = telegramChatIds();
+  if (chatIds.length === 0) throw new Error('Telegram chat id is not configured');
   const attemptNumber = Number(notification.attempt_count || 0) + 1;
+  const results = [];
 
-  try {
-    const result = await sendTelegramMessage({ chatId, text, replyMarkup });
-    await supabase.from('telegram_delivery_attempts').insert({
-      notification_id: notification.id,
-      attempt_number: attemptNumber,
-      response_status: result.status,
-      response_body: { ok: result.body.ok },
-      error_message: null
-    });
-    await supabase.from('telegram_notifications').update({
-      telegram_chat_id: chatId,
-      telegram_message_id: result.body.result?.message_id || null,
-      status: 'sent',
-      attempt_count: attemptNumber,
-      error_message: null,
-      sent_at: new Date().toISOString()
-    }).eq('id', notification.id);
-    return 'sent';
-  } catch (error) {
-    await supabase.from('telegram_delivery_attempts').insert({
-      notification_id: notification.id,
-      attempt_number: attemptNumber,
-      response_status: null,
-      response_body: {},
-      error_message: safeErrorMessage(error)
-    });
-    await supabase.from('telegram_notifications').update({
-      telegram_chat_id: chatId,
-      status: 'failed',
-      attempt_count: attemptNumber,
-      error_message: safeErrorMessage(error)
-    }).eq('id', notification.id);
-    return 'failed';
+  for (const chatId of chatIds) {
+    try {
+      const result = await sendTelegramMessage({ chatId, text, replyMarkup });
+      results.push({ chatId, status: 'sent', responseStatus: result.status, messageId: result.body.result?.message_id || null });
+    } catch (error) {
+      results.push({ chatId, status: 'failed', error: safeErrorMessage(error) });
+    }
   }
+
+  const sentResults = results.filter((result) => result.status === 'sent');
+  const failedResults = results.filter((result) => result.status === 'failed');
+  const status = sentResults.length > 0 && failedResults.length === 0 ? 'sent' : sentResults.length > 0 ? 'sent' : 'failed';
+  const errorMessage = failedResults.length ? failedResults.map((result) => `${result.chatId}: ${result.error}`).join('; ') : null;
+
+  for (const result of results) {
+    await supabase.from('telegram_delivery_attempts').insert({
+      notification_id: notification.id,
+      attempt_number: attemptNumber,
+      response_status: result.status === 'sent' ? result.responseStatus : null,
+      response_body: { ok: result.status === 'sent', chatId: result.chatId },
+      error_message: result.status === 'sent' ? null : result.error || 'Telegram request failed'
+    });
+  }
+
+  await supabase.from('telegram_notifications').update({
+    telegram_chat_id: chatIds.join(','),
+    telegram_message_id: chatIds.length === 1 ? sentResults[0]?.messageId || null : null,
+    status,
+    attempt_count: attemptNumber,
+    error_message: errorMessage,
+    sent_at: sentResults.length > 0 ? new Date().toISOString() : null
+  }).eq('id', notification.id);
+
+  return sentResults.length > 0 ? 'sent' : 'failed';
 }
 
 Deno.serve(async (request) => {

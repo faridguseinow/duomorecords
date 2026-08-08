@@ -114,3 +114,10 @@ export function allowedTelegramUserIds() {
     .map((item) => item.trim())
     .filter(Boolean);
 }
+
+export function telegramChatIds() {
+  return (Deno.env.get('TELEGRAM_CHAT_IDS') || Deno.env.get('TELEGRAM_CHAT_ID') || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}

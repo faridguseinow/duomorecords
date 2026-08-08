@@ -219,7 +219,7 @@ export async function getHomepageContent(language) {
     safeQuery(
       'site_settings',
       [],
-      () => supabase.from('site_settings').select('*').in('setting_key', ['contact_information', 'social_links'])
+      () => supabase.from('site_settings').select('*').in('setting_key', ['contact_information', 'social_links', 'default_seo'])
     )
   ]);
   const siteSettingsMap = Object.fromEntries((siteSettings.value || []).map((row) => [row.setting_key, row.value || {}]));
@@ -236,6 +236,7 @@ export async function getHomepageContent(language) {
     instagramPosts: instagram.value,
     contactInformation: siteSettingsMap.contact_information || fallback.contactInformation,
     socialLinks: siteSettingsMap.social_links || fallback.socialLinks,
+    defaultSeo: siteSettingsMap.default_seo || null,
     timeSlots: fallback.timeSlots,
     bookingSettings: bookingSettings.value,
     sections: sections.value,
